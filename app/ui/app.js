@@ -1,0 +1,1707 @@
+/**
+ * Veil — Enterprise AI Privacy Gateway
+ * Cockpit Frontend Application Logic
+ */
+(function() {
+  'use strict';
+
+  // State Store
+  const state = {
+    ws: null,
+    metrics: {
+      total_requests: 0,
+      total_redactions: 0,
+      total_blocks: 0,
+      is_paused: false,
+      audit_count: 0
+    },
+    policy: 'STRICT',
+    clients: [],
+    activeView: 'dashboard',
+    activeFilter: 'all',
+    searchQuery: '',
+    autostartEnabled: false,
+    chartBuckets: Array.from({ length: 30 }, () => ({ clean: 0, redacted: 0, blocked: 0 })),
+    eventsLog: [],
+    customEntities: [],
+    entityFilter: 'all',
+    entitySearchQuery: ''
+  };
+
+  // DOM Elements
+  const DOM = {
+    // Navigation
+    navItems: document.querySelectorAll('.nav-item'),
+    views: document.querySelectorAll('.view'),
+    navClientCount: document.getElementById('nav-client-count'),
+    topbarViewTitle: document.getElementById('topbar-view-title'),
+    topbarViewCrumb: document.getElementById('topbar-view-crumb'),
+
+    // Gateway status & controls
+    gatewayStatusPill: document.getElementById('gateway-status-pill'),
+    statusPulseDot: document.getElementById('status-pulse-dot'),
+    statusLabel: document.getElementById('status-label'),
+    policySegmented: document.getElementById('policy-segmented'),
+    policySelect: document.getElementById('policy-select'),
+    btnToggleGateway: document.getElementById('btn-toggle-gateway'),
+    toggleIcon: document.getElementById('toggle-icon'),
+    toggleText: document.getElementById('toggle-text'),
+    switchGatewayActive: document.getElementById('switch-gateway-active'),
+    overviewHeroCard: document.getElementById('overview-hero-card'),
+    activePolicyPill: document.getElementById('active-policy-pill'),
+
+    // Sidebar status
+    wsDot: document.getElementById('ws-dot'),
+    wsText: document.getElementById('ws-text'),
+    sidebarProxyStatus: document.getElementById('sidebar-proxy-status'),
+    sidebarProxyAddr: document.getElementById('sidebar-proxy-addr'),
+    btnCopyProxy: document.getElementById('btn-copy-proxy'),
+
+    // Dashboard metrics
+    statRequests: document.getElementById('stat-total-requests'),
+    statRedactions: document.getElementById('stat-total-redactions'),
+    statBlocks: document.getElementById('stat-total-blocks'),
+    statConnectedClients: document.getElementById('stat-connected-clients'),
+    displayAuditCount: document.getElementById('display-audit-count'),
+    dashboardMiniFeed: document.getElementById('dashboard-mini-feed'),
+    dashboardMiniClients: document.getElementById('dashboard-mini-clients'),
+    btnViewAllTelemetry: document.getElementById('btn-view-all-telemetry'),
+    btnViewAllClients: document.getElementById('btn-view-all-clients'),
+
+    // Chart
+    chartBarsContainer: document.getElementById('chart-bars-container'),
+    chartTooltip: document.getElementById('chart-tooltip'),
+
+    // Clients
+    clientsContainer: document.getElementById('clients-container'),
+    btnRescanClients: document.getElementById('btn-rescan-clients'),
+
+    // Telemetry
+    telemetryTerminal: document.getElementById('telemetry-terminal'),
+    feedItems: document.getElementById('feed-items'),
+    feedFilters: document.getElementById('feed-filters'),
+    btnClearFeed: document.getElementById('btn-clear-feed'),
+    searchTelemetry: document.getElementById('search-telemetry'),
+    logCountSummary: document.getElementById('log-count-summary'),
+
+    // Playground
+    sandboxInput: document.getElementById('sandbox-input'),
+    inputCharCount: document.getElementById('input-char-count'),
+    btnRunSandbox: document.getElementById('btn-run-sandbox'),
+    presetSecret: document.getElementById('preset-secret'),
+    presetPii: document.getElementById('preset-pii'),
+    presetClean: document.getElementById('preset-clean'),
+    sandboxVerdictBanner: document.getElementById('sandbox-verdict-banner'),
+    sandboxResultBadge: document.getElementById('sandbox-result-badge'),
+    sandboxResultSub: document.getElementById('sandbox-result-sub'),
+    sandboxResultMeta: document.getElementById('sandbox-result-meta'),
+    sandboxResultBody: document.getElementById('sandbox-result-body'),
+    sandboxFindingsContainer: document.getElementById('sandbox-findings-container'),
+    sandboxViolationsList: document.getElementById('sandbox-violations-list'),
+
+    // Settings
+    autostartToggle: document.getElementById('autostart-toggle'),
+    btnCopySettingsProxy: document.getElementById('btn-copy-settings-proxy'),
+    toastsContainer: document.getElementById('toasts-container'),
+
+    // Custom Entities
+    navEntitiesCount: document.getElementById('nav-entities-count'),
+    entityRulesList: document.getElementById('entity-rules-list'),
+    entityRulesCountPill: document.getElementById('entity-rules-count-pill'),
+    formAddEntity: document.getElementById('form-add-entity'),
+    entityInputName: document.getElementById('entity-input-name'),
+    entityInputPattern: document.getElementById('entity-input-pattern'),
+    entityInputPrefix: document.getElementById('entity-input-prefix'),
+    entityInputAction: document.getElementById('entity-input-action'),
+    entityInputDesc: document.getElementById('entity-input-desc'),
+    entityInputRegex: document.getElementById('entity-input-regex'),
+    entityInputCase: document.getElementById('entity-input-case'),
+    btnSaveEntity: document.getElementById('btn-save-entity'),
+
+    // Entity Presets
+    presetEntityProject: document.getElementById('preset-entity-project'),
+    presetEntityClient: document.getElementById('preset-entity-client'),
+    presetEntityBlocked: document.getElementById('preset-entity-blocked'),
+    presetEntityNetwork: document.getElementById('preset-entity-network'),
+    presetEntityAccount: document.getElementById('preset-entity-account'),
+
+    // Entity Live Simulator
+    entityLiveTestInput: document.getElementById('entity-live-test-input'),
+    entityLiveTestOutput: document.getElementById('entity-live-test-output'),
+
+    // Entity Filters & Export/Import
+    searchEntityRules: document.getElementById('search-entity-rules'),
+    entityFilterSegmented: document.getElementById('entity-filter-segmented'),
+    btnExportEntities: document.getElementById('btn-export-entities'),
+    btnImportEntities: document.getElementById('btn-import-entities'),
+    inputImportEntities: document.getElementById('input-import-entities')
+  };
+
+  // SVGs for AI Clients
+  const CLIENT_ICONS = {
+    antigravity: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2z"></path><circle cx="12" cy="14" r="3"></circle></svg>`,
+    cursor: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l7 17 2.5-6.5L20 12 4 4z"></path></svg>`,
+    continue: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`,
+    claude_code: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v10M7 12h10"></path></svg>`,
+    aider: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"></rect><line x1="8" y1="20" x2="16" y2="20"></line><line x1="12" y1="16" x2="12" y2="20"></line></svg>`,
+    system_env: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>`,
+    opencode: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"></path><path d="M8 6l-6 6 6 6"></path><circle cx="12" cy="12" r="2"></circle></svg>`,
+    default: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg>`
+  };
+
+  // View metadata configuration
+  const VIEW_META = {
+    dashboard: {
+      title: 'System Overview',
+      crumb: 'Local In-Memory Isolation • Zero Cloud Retention'
+    },
+    clients: {
+      title: 'AI Client Environments',
+      crumb: 'Autonomous Zero-Corruption Configuration • 1-Click Rollback'
+    },
+    telemetry: {
+      title: 'Live Telemetry & Ledger',
+      crumb: 'Real-Time Event Stream • Cryptographic Inspection Receipts'
+    },
+    playground: {
+      title: 'Inspection Sandbox',
+      crumb: 'Heuristic & Regex Privacy Simulation Engine'
+    },
+    entities: {
+      title: 'Enterprise Entity Dictionary & Blacklist',
+      crumb: 'Custom Codenames, Client Lists & Regex Privacy Rules'
+    },
+    settings: {
+      title: 'System Settings',
+      crumb: 'Host Integration & Port Management'
+    }
+  };
+
+  /**
+   * App Initialization
+   */
+  function init() {
+    setupNavigation();
+    setupEventListeners();
+    setupShortcuts();
+    renderChart();
+    connectWebSocket();
+    fetchClients();
+    fetchMetrics();
+    fetchAutostart();
+    fetchCustomEntities();
+    setupEntityForm();
+    setupEntityPresets();
+    setupEntitySimulator();
+    setupEntityFiltersAndExport();
+
+    // Dynamically advance rolling 1-minute throughput window
+    setInterval(() => {
+      if (state.chartBuckets && state.chartBuckets.length > 0) {
+        state.chartBuckets.shift();
+        state.chartBuckets.push({ clean: 0, redacted: 0, blocked: 0 });
+        renderChart();
+      }
+    }, 60000);
+
+    // Heartbeat metrics sync
+    setInterval(fetchMetrics, 10000);
+  }
+
+  /**
+   * View Navigation
+   */
+  function setupNavigation() {
+    DOM.navItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const viewId = item.dataset.view;
+        switchView(viewId);
+      });
+    });
+
+    if (DOM.btnViewAllTelemetry) {
+      DOM.btnViewAllTelemetry.addEventListener('click', () => switchView('telemetry'));
+    }
+    if (DOM.btnViewAllClients) {
+      DOM.btnViewAllClients.addEventListener('click', () => switchView('clients'));
+    }
+  }
+
+  function switchView(viewId) {
+    if (!viewId) return;
+    state.activeView = viewId;
+
+    DOM.navItems.forEach(nav => {
+      if (nav.dataset.view === viewId) {
+        nav.classList.add('active');
+      } else {
+        nav.classList.remove('active');
+      }
+    });
+
+    DOM.views.forEach(v => {
+      if (v.id === `view-${viewId}`) {
+        v.classList.add('active');
+      } else {
+        v.classList.remove('active');
+      }
+    });
+
+    const meta = VIEW_META[viewId] || { title: 'Veil Gateway', crumb: '' };
+    DOM.topbarViewTitle.textContent = meta.title;
+    DOM.topbarViewCrumb.textContent = meta.crumb;
+  }
+
+  /**
+   * UI Event Listeners
+   */
+  function setupEventListeners() {
+    // Gateway pause/resume toggles
+    DOM.btnToggleGateway.addEventListener('click', toggleGatewayState);
+    if (DOM.switchGatewayActive) {
+      DOM.switchGatewayActive.addEventListener('click', toggleGatewayState);
+    }
+
+    // Policy segmented buttons
+    DOM.policySegmented.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const policy = btn.dataset.policy;
+        setPolicy(policy);
+      });
+    });
+
+    // Copy proxy address
+    if (DOM.btnCopyProxy) {
+      DOM.btnCopyProxy.addEventListener('click', () => copyToClipboard('http://127.0.0.1:8080/v1', 'Proxy URL copied!'));
+    }
+    if (DOM.btnCopySettingsProxy) {
+      DOM.btnCopySettingsProxy.addEventListener('click', () => copyToClipboard('http://127.0.0.1:8080/v1', 'Proxy URL copied!'));
+    }
+
+    // Rescan clients button
+    DOM.btnRescanClients.addEventListener('click', () => {
+      DOM.btnRescanClients.classList.add('is-loading');
+      fetchClients().finally(() => {
+        setTimeout(() => DOM.btnRescanClients.classList.remove('is-loading'), 350);
+      });
+    });
+
+    // Telemetry filters
+    DOM.feedFilters.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        DOM.feedFilters.querySelectorAll('button').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-pressed', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+        state.activeFilter = btn.dataset.filter;
+        applyFeedFilters();
+      });
+    });
+
+    // Telemetry clear
+    DOM.btnClearFeed.addEventListener('click', () => {
+      state.eventsLog = [];
+      DOM.feedItems.innerHTML = `
+        <div class="empty" id="feed-empty-state">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </span>
+          <div class="empty-title">Telemetry Buffer Cleared</div>
+          <div class="empty-desc">New outbound requests will stream here live.</div>
+        </div>
+      `;
+      DOM.logCountSummary.textContent = '0 events recorded';
+      showToast('Telemetry stream cleared', 'info');
+    });
+
+    // Telemetry search input
+    DOM.searchTelemetry.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value.toLowerCase().trim();
+      applyFeedFilters();
+    });
+
+    // Playground presets
+    DOM.presetSecret.addEventListener('click', () => {
+      DOM.sandboxInput.value = 'Deploy to AWS: AccessKey=AKIAIOSFODNN7EXAMPLE Secret=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY in region us-east-1';
+      updateInputCharCount();
+    });
+    DOM.presetPii.addEventListener('click', () => {
+      DOM.sandboxInput.value = 'Customer support escalation for Alice Walker (email: alice.walker@enterprise.io, phone: 415-555-0199).';
+      updateInputCharCount();
+    });
+    DOM.presetClean.addEventListener('click', () => {
+      DOM.sandboxInput.value = 'def quicksort(arr):\n    if len(arr) <= 1: return arr\n    pivot = arr[len(arr) // 2]\n    return quicksort([x for x in arr if x < pivot]) + [x for x in arr if x == pivot] + quicksort([x for x in arr if x > pivot])';
+      updateInputCharCount();
+    });
+
+    DOM.sandboxInput.addEventListener('input', updateInputCharCount);
+    DOM.btnRunSandbox.addEventListener('click', executeSandboxInspection);
+
+    // Autostart switch
+    if (DOM.autostartToggle) {
+      DOM.autostartToggle.addEventListener('click', toggleAutostart);
+    }
+  }
+
+  function updateInputCharCount() {
+    const len = DOM.sandboxInput.value.length;
+    DOM.inputCharCount.textContent = `${len} char${len === 1 ? '' : 's'}`;
+  }
+
+  /**
+   * Keyboard shortcuts
+   */
+  function setupShortcuts() {
+    window.addEventListener('keydown', (e) => {
+      // Don't intercept when focusing text inputs
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && document.activeElement === DOM.sandboxInput) {
+          e.preventDefault();
+          executeSandboxInspection();
+        }
+        return;
+      }
+
+      if (e.key === '1') switchView('dashboard');
+      if (e.key === '2') switchView('clients');
+      if (e.key === '3') switchView('telemetry');
+      if (e.key === '4') switchView('playground');
+      if (e.key === '5') switchView('entities');
+      if (e.key === '6') switchView('settings');
+    });
+  }
+
+  /**
+   * Gateway Toggle & Policy Controls
+   */
+  async function toggleGatewayState() {
+    try {
+      const res = await fetch('/api/gateway/toggle', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        state.metrics.is_paused = data.is_paused;
+        updateGatewayUI();
+        showToast(data.is_paused ? 'Gateway Paused (Bypass Mode)' : 'Gateway Resumed (Interception Active)', data.is_paused ? 'bad' : 'ok');
+      }
+    } catch (err) {
+      console.error('Error toggling gateway:', err);
+    }
+  }
+
+  function updateGatewayUI() {
+    const paused = state.metrics.is_paused;
+
+    if (paused) {
+      // Topbar status badge
+      DOM.gatewayStatusPill.className = 'pill warn';
+      DOM.statusPulseDot.className = 'dot warn';
+      DOM.statusLabel.textContent = 'GATEWAY PAUSED';
+
+      // Button state
+      DOM.btnToggleGateway.className = 'btn btn-sm btn-primary';
+      DOM.toggleIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+      DOM.toggleText.textContent = 'Resume Gateway';
+
+      // Sidebar summary
+      DOM.sidebarProxyStatus.className = 'pill warn';
+      DOM.sidebarProxyStatus.innerHTML = '<span class="dot warn"></span><span>PAUSED</span>';
+
+      // Hero panel
+      DOM.overviewHeroCard.classList.add('paused');
+      if (DOM.switchGatewayActive) {
+        DOM.switchGatewayActive.setAttribute('aria-checked', 'false');
+      }
+    } else {
+      // Topbar status badge
+      DOM.gatewayStatusPill.className = 'pill ok';
+      DOM.statusPulseDot.className = 'dot ok live';
+      DOM.statusLabel.textContent = 'GATEWAY ACTIVE';
+
+      // Button state
+      DOM.btnToggleGateway.className = 'btn btn-sm';
+      DOM.toggleIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+      DOM.toggleText.textContent = 'Pause Gateway';
+
+      // Sidebar summary
+      DOM.sidebarProxyStatus.className = 'pill ok';
+      DOM.sidebarProxyStatus.innerHTML = '<span class="dot ok live"></span><span>ACTIVE</span>';
+
+      // Hero panel
+      DOM.overviewHeroCard.classList.remove('paused');
+      if (DOM.switchGatewayActive) {
+        DOM.switchGatewayActive.setAttribute('aria-checked', 'true');
+      }
+    }
+  }
+
+  async function setPolicy(policy) {
+    try {
+      const res = await fetch('/api/gateway/policy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ policy: policy })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        state.policy = data.policy;
+        updatePolicyUI();
+        showToast(`Policy Tier: ${data.policy}`, 'ok');
+      }
+    } catch (err) {
+      console.error('Error changing policy:', err);
+    }
+  }
+
+  function updatePolicyUI() {
+    DOM.policySegmented.querySelectorAll('button').forEach(btn => {
+      const isSelected = btn.dataset.policy === state.policy;
+      btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    });
+
+    if (DOM.activePolicyPill) {
+      DOM.activePolicyPill.textContent = state.policy;
+      DOM.activePolicyPill.className = state.policy === 'STRICT' ? 'pill bad' : (state.policy === 'BALANCED' ? 'pill warn' : 'pill info');
+    }
+    if (DOM.policySelect) {
+      DOM.policySelect.value = state.policy;
+    }
+  }
+
+  /**
+   * WebSocket Real-Time Telemetry Stream
+   */
+  function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/telemetry`;
+
+    try {
+      state.ws = new WebSocket(wsUrl);
+
+      state.ws.onopen = () => {
+        DOM.wsDot.className = 'dot ok live';
+        DOM.wsText.textContent = 'Live Connected';
+      };
+
+      state.ws.onclose = () => {
+        DOM.wsDot.className = 'dot warn';
+        DOM.wsText.textContent = 'Reconnecting...';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      state.ws.onerror = () => {
+        DOM.wsDot.className = 'dot bad';
+        DOM.wsText.textContent = 'Disconnected';
+      };
+
+      state.ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          handleWebSocketPayload(payload);
+        } catch (e) {
+          console.error('WS parse error:', e);
+        }
+      };
+    } catch (e) {
+      console.error('WebSocket connection error:', e);
+    }
+  }
+
+  function handleWebSocketPayload(payload) {
+    if (payload.type === 'init') {
+      const initData = payload.data || {};
+      state.policy = initData.policy || 'STRICT';
+      state.metrics.is_paused = !!initData.is_paused;
+      if (initData.metrics) {
+        state.metrics = { ...state.metrics, ...initData.metrics };
+      }
+      updateGatewayUI();
+      updatePolicyUI();
+      updateMetricsDisplay();
+
+      if (initData.clients) {
+        state.clients = initData.clients;
+        renderClientCards(state.clients);
+      }
+
+      if (initData.history && Array.isArray(initData.history)) {
+        initData.history.forEach(ev => appendTelemetryEvent(ev, false));
+      }
+      return;
+    }
+
+    // Live Event Dispatch
+    const evType = payload.type || payload.event_type;
+    const data = payload.data || payload;
+
+    if (evType === 'redaction') {
+      state.metrics.total_requests++;
+      state.metrics.total_redactions += (data.redaction_count || 1);
+      pushChartEvent('redacted');
+      appendTelemetryEvent({ type: 'redaction', timestamp: Date.now() / 1000, data });
+    } else if (evType === 'blocked') {
+      state.metrics.total_requests++;
+      state.metrics.total_blocks++;
+      pushChartEvent('blocked');
+      appendTelemetryEvent({ type: 'blocked', timestamp: Date.now() / 1000, data });
+    } else if (evType === 'clean_pass') {
+      state.metrics.total_requests++;
+      pushChartEvent('clean');
+      appendTelemetryEvent({ type: 'clean_pass', timestamp: Date.now() / 1000, data });
+    } else if (evType === 'client_status') {
+      appendTelemetryEvent({ type: 'client_status', timestamp: Date.now() / 1000, data });
+      fetchClients();
+    } else if (evType === 'metric') {
+      if (data.is_paused !== undefined) {
+        state.metrics.is_paused = data.is_paused;
+        updateGatewayUI();
+      }
+      if (data.policy) {
+        state.policy = data.policy;
+        updatePolicyUI();
+      }
+    }
+
+    updateMetricsDisplay();
+  }
+
+  /**
+   * Metrics Fetch & Display
+   */
+  async function fetchMetrics() {
+    try {
+      const res = await fetch('/api/metrics');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.metrics) {
+          state.metrics = { ...state.metrics, ...data.metrics };
+        }
+        if (data.policy) state.policy = data.policy;
+        if (data.audit_count !== undefined) state.metrics.audit_count = data.audit_count;
+        if (data.recent_buckets && Array.isArray(data.recent_buckets) && data.recent_buckets.length === 30) {
+          state.chartBuckets = data.recent_buckets;
+          renderChart();
+        }
+        if (data.recent_events && Array.isArray(data.recent_events) && data.recent_events.length > 0) {
+          data.recent_events.slice().reverse().forEach(ev => {
+            updateDashboardMiniFeed(ev);
+          });
+        }
+        updateMetricsDisplay();
+        updateGatewayUI();
+        updatePolicyUI();
+      }
+    } catch (e) {
+      console.error('Fetch metrics error:', e);
+    }
+  }
+
+  function updateMetricsDisplay() {
+    DOM.statRequests.textContent = formatNumber(state.metrics.total_requests || 0);
+    DOM.statRedactions.textContent = formatNumber(state.metrics.total_redactions || 0);
+    DOM.statBlocks.textContent = formatNumber(state.metrics.total_blocks || 0);
+
+    const connectedCount = state.clients.filter(c => c.status === 'CONNECTED').length;
+    DOM.statConnectedClients.textContent = connectedCount;
+    DOM.navClientCount.textContent = `${connectedCount}/${state.clients.length || 7}`;
+
+    if (DOM.displayAuditCount) {
+      DOM.displayAuditCount.textContent = `${formatNumber(state.metrics.total_requests || 0)} cryptographically sealed`;
+    }
+  }
+
+  /**
+   * AI Clients Rendering & Actions
+   */
+  async function fetchClients() {
+    try {
+      const res = await fetch('/api/clients');
+      if (res.ok) {
+        const data = await res.json();
+        state.clients = Array.isArray(data) ? data : (data.clients || []);
+        renderClientCards(state.clients);
+        updateMetricsDisplay();
+      }
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+      DOM.clientsContainer.innerHTML = `
+        <div class="empty">
+          <div class="empty-title" style="color: var(--rose);">Client Discovery Error</div>
+          <div class="empty-desc">Failed to reach the local client management API.</div>
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Renders the client cards into DOM.
+   * Kept named `renderClientCards` as verified by test_ui.py
+   */
+  function renderClientCards(clients) {
+    if (!clients || clients.length === 0) {
+      DOM.clientsContainer.innerHTML = `
+        <div class="empty">
+          <div class="empty-title">No AI Clients Detected</div>
+          <div class="empty-desc">Install an AI code editor or configure environment variables.</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    const installed = clients.filter(c => c.status === 'CONNECTED' || c.status === 'DETECTED');
+    const notInstalled = clients.filter(c => c.status !== 'CONNECTED' && c.status !== 'DETECTED');
+
+    if (installed.length > 0) {
+      html += `<div class="client-group-label"><span>INSTALLED & CONFIGURED</span><span>${installed.length} DETECTED</span></div>`;
+      installed.forEach(c => { html += buildClientRowHtml(c); });
+    }
+
+    if (notInstalled.length > 0) {
+      html += `<div class="client-group-label"><span>AVAILABLE CLIENTS (NOT DETECTED)</span><span>${notInstalled.length}</span></div>`;
+      notInstalled.forEach(c => { html += buildClientRowHtml(c); });
+    }
+
+    DOM.clientsContainer.innerHTML = html;
+    attachClientRowActions();
+    renderMiniDashboardClients(clients);
+  }
+
+  function buildClientRowHtml(client) {
+    const isConnected = client.status === 'CONNECTED';
+    const isDetected = client.status === 'DETECTED';
+    const isError = client.status === 'ERROR';
+    const isMissing = client.status === 'NOT_INSTALLED';
+
+    let badge = '';
+    let actionBtn = '';
+
+    if (isConnected) {
+      badge = `<span class="pill ok"><span class="dot ok live"></span>CONNECTED</span>`;
+      actionBtn = `
+        <button class="btn btn-sm btn-danger btn-client-disconnect" data-id="${escapeHtml(client.id)}">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>
+          <span>Disconnect</span>
+        </button>
+      `;
+    } else if (isDetected) {
+      badge = `<span class="pill warn"><span class="dot warn"></span>DETECTED</span>`;
+      actionBtn = `
+        <button class="btn btn-sm btn-primary btn-client-connect" data-id="${escapeHtml(client.id)}">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+          <span>Connect</span>
+        </button>
+      `;
+    } else if (isError) {
+      badge = `<span class="pill bad"><span class="dot bad"></span>ERROR</span>`;
+      actionBtn = `<button class="btn btn-sm" disabled>Invalid Config</button>`;
+    } else {
+      badge = `<span class="pill"><span class="dot"></span>NOT INSTALLED</span>`;
+      actionBtn = `<button class="btn btn-sm" disabled>Not Found</button>`;
+    }
+
+    const iconSvg = CLIENT_ICONS[client.id] || CLIENT_ICONS.default;
+    const pathText = client.config_path || 'Managed via System Environment';
+
+    return `
+      <div class="client-row ${isMissing ? 'is-missing' : ''}" data-id="${escapeHtml(client.id)}">
+        <div class="client-logo">
+          ${iconSvg}
+        </div>
+        <div>
+          <div class="client-name">
+            <span>${escapeHtml(client.name)}</span>
+            ${badge}
+          </div>
+          <div class="client-desc">${escapeHtml(client.description)}</div>
+          <div class="client-path btn-copy-path" data-path="${escapeHtml(pathText)}" title="Click to copy configuration path">
+            <span>${escapeHtml(pathText)}</span>
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div class="client-actions">
+          ${actionBtn}
+        </div>
+      </div>
+    `;
+  }
+
+  function attachClientRowActions() {
+    // Connect Buttons
+    DOM.clientsContainer.querySelectorAll('.btn-client-connect').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = btn.dataset.id;
+        btn.classList.add('is-loading');
+        try {
+          const res = await fetch(`/api/clients/${id}/connect`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(`Connected ${id} to Veil gateway!`, 'ok');
+          } else {
+            showToast(`Connection failed: ${data.message}`, 'bad');
+          }
+        } catch (err) {
+          showToast(`Network error connecting ${id}`, 'bad');
+        } finally {
+          btn.classList.remove('is-loading');
+          fetchClients();
+        }
+      });
+    });
+
+    // Disconnect Buttons
+    DOM.clientsContainer.querySelectorAll('.btn-client-disconnect').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = btn.dataset.id;
+        btn.classList.add('is-loading');
+        try {
+          const res = await fetch(`/api/clients/${id}/disconnect`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            showToast(`Disconnected ${id}. Configuration restored from backup.`, 'ok');
+          } else {
+            showToast(`Disconnect failed: ${data.message}`, 'bad');
+          }
+        } catch (err) {
+          showToast(`Network error disconnecting ${id}`, 'bad');
+        } finally {
+          btn.classList.remove('is-loading');
+          fetchClients();
+        }
+      });
+    });
+
+    // Copy Path click
+    DOM.clientsContainer.querySelectorAll('.btn-copy-path').forEach(el => {
+      el.addEventListener('click', () => {
+        const path = el.dataset.path;
+        if (path) copyToClipboard(path, 'Configuration path copied!');
+      });
+    });
+  }
+
+  function renderMiniDashboardClients(clients) {
+    if (!DOM.dashboardMiniClients) return;
+    let html = '';
+    const sorted = [...clients].sort((a, b) => {
+      const score = (s) => (s === 'CONNECTED' ? 3 : s === 'DETECTED' ? 2 : 1);
+      return score(b.status) - score(a.status);
+    });
+
+    sorted.slice(0, 4).forEach(c => {
+      const isConnected = c.status === 'CONNECTED';
+      const isDetected = c.status === 'DETECTED';
+      const statusPill = isConnected
+        ? `<span class="pill ok"><span class="dot ok live"></span>Connected</span>`
+        : (isDetected ? `<span class="pill warn">Detected</span>` : `<span class="pill">Inactive</span>`);
+
+      html += `
+        <li>
+          <span class="ev-icon ${isConnected ? 'redaction' : ''}">
+            ${CLIENT_ICONS[c.id] || CLIENT_ICONS.default}
+          </span>
+          <span class="name">${escapeHtml(c.name)}</span>
+          ${statusPill}
+        </li>
+      `;
+    });
+    DOM.dashboardMiniClients.innerHTML = html;
+  }
+
+  /**
+   * Telemetry Feed & Table
+   */
+  function appendTelemetryEvent(event, prepend = true) {
+    state.eventsLog.push(event);
+    if (state.eventsLog.length > 200) {
+      state.eventsLog.shift();
+    }
+
+    const rowHtml = buildTelemetryRowHtml(event);
+
+    const empty = document.getElementById('feed-empty-state');
+    if (empty) empty.remove();
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = rowHtml.trim();
+    const rowEl = tempDiv.firstElementChild;
+
+    // Attach expandable click
+    rowEl.addEventListener('click', () => {
+      rowEl.classList.toggle('open');
+    });
+
+    if (prepend && DOM.feedItems.firstChild) {
+      DOM.feedItems.insertBefore(rowEl, DOM.feedItems.firstChild);
+    } else {
+      DOM.feedItems.appendChild(rowEl);
+    }
+
+    DOM.logCountSummary.textContent = `${state.eventsLog.length} event${state.eventsLog.length === 1 ? '' : 's'} recorded`;
+
+    // Also update Dashboard mini feed
+    updateDashboardMiniFeed(event);
+  }
+
+  function buildTelemetryRowHtml(ev) {
+    const date = new Date((ev.timestamp || Date.now() / 1000) * 1000);
+    const timeStr = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const data = ev.data || {};
+
+    let badge = '';
+    let details = '';
+    let category = 'other';
+    const model = data.model || 'direct';
+    const latency = data.latency_ms !== undefined ? `${data.latency_ms.toFixed(1)}ms` : '--';
+
+    if (ev.type === 'redaction') {
+      category = 'redaction';
+      badge = `<span class="pill ok"><span class="dot ok"></span>REDACTED</span>`;
+      details = `Sanitized <b>${data.redaction_count || 1} sensitive tokens</b> from prompt`;
+    } else if (ev.type === 'blocked') {
+      category = 'blocked';
+      badge = `<span class="pill bad"><span class="dot bad"></span>BLOCKED</span>`;
+      const viols = (data.violations || []).map(v => `<span class="tag">${escapeHtml(v)}</span>`).join('');
+      details = `Blocked leak: ${data.reason || 'Credentials'} ${viols}`;
+    } else if (ev.type === 'clean_pass') {
+      category = 'clean';
+      badge = `<span class="pill"><span class="dot"></span>CLEAN</span>`;
+      details = `Prompt verified safe; forwarded directly`;
+    } else if (ev.type === 'client_status') {
+      category = 'client';
+      badge = `<span class="pill info"><span class="dot"></span>CLIENT</span>`;
+      details = `Client ${data.client_id} status updated to <b>${data.status}</b>`;
+    } else {
+      badge = `<span class="pill">${escapeHtml(ev.type || 'EVENT')}</span>`;
+      details = JSON.stringify(data);
+    }
+
+    return `
+      <div class="log-row is-new" data-category="${category}" data-search="${escapeHtml((details + ' ' + model).toLowerCase())}">
+        <div class="t">${timeStr}</div>
+        <div>${badge}</div>
+        <div class="msg">${details}</div>
+        <div class="model">${escapeHtml(model)}</div>
+        <div class="lat r">${latency}</div>
+        <div class="log-detail">
+          <pre>${escapeHtml(JSON.stringify(ev, null, 2))}</pre>
+        </div>
+      </div>
+    `;
+  }
+
+  function applyFeedFilters() {
+    const rows = DOM.feedItems.querySelectorAll('.log-row');
+    rows.forEach(row => {
+      const cat = row.dataset.category;
+      const search = row.dataset.search || '';
+
+      const matchesFilter = state.activeFilter === 'all' || cat === state.activeFilter;
+      const matchesSearch = !state.searchQuery || search.includes(state.searchQuery);
+
+      if (matchesFilter && matchesSearch) {
+        row.style.display = 'grid';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  function updateDashboardMiniFeed(ev) {
+    if (!DOM.dashboardMiniFeed) return;
+    const placeholder = DOM.dashboardMiniFeed.querySelector('.empty-feed-placeholder');
+    if (placeholder) placeholder.remove();
+
+    const data = ev.data || {};
+    const date = new Date((ev.timestamp || Date.now() / 1000) * 1000);
+    const timeStr = date.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+    let iconClass = 'system';
+    let title = 'Gateway Event';
+    let sub = '';
+
+    if (ev.type === 'redaction') {
+      iconClass = 'redaction';
+      title = `Prompt Sanitized (${data.redaction_count || 1} tokens)`;
+      sub = `Replaced with reversible session placeholders`;
+    } else if (ev.type === 'blocked') {
+      iconClass = 'blocked';
+      title = `Exfiltration Blocked`;
+      sub = data.reason || 'Prohibited credential patterns detected';
+    } else if (ev.type === 'clean_pass') {
+      iconClass = 'clean';
+      title = `Prompt Forwarded (Clean)`;
+      sub = data.reason || 'Verified safe • Zero sensitive entities detected';
+    } else if (ev.type === 'client_status') {
+      iconClass = 'client';
+      title = `Client ${data.client_id}`;
+      sub = `Status updated to ${data.status}`;
+    }
+
+    const dotClass = iconClass === 'redaction' ? 'ok' : (iconClass === 'blocked' ? 'bad' : (iconClass === 'clean' ? '' : 'warn'));
+
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span class="ev-icon ${iconClass}">
+        <span class="dot ${dotClass}"></span>
+      </span>
+      <div>
+        <div class="ev-title">${escapeHtml(title)}</div>
+        <div class="ev-sub">${escapeHtml(sub)}</div>
+      </div>
+      <span class="ev-time">${timeStr}</span>
+    `;
+
+    DOM.dashboardMiniFeed.insertBefore(li, DOM.dashboardMiniFeed.firstChild);
+    if (DOM.dashboardMiniFeed.children.length > 5) {
+      DOM.dashboardMiniFeed.removeChild(DOM.dashboardMiniFeed.lastChild);
+    }
+  }
+
+  /**
+   * Interactive Throughput Chart
+   */
+  function pushChartEvent(kind) {
+    const lastBucket = state.chartBuckets[state.chartBuckets.length - 1];
+    if (kind === 'redacted') lastBucket.redacted++;
+    else if (kind === 'blocked') lastBucket.blocked++;
+    else lastBucket.clean++;
+    renderChart();
+  }
+
+  function renderChart() {
+    if (!DOM.chartBarsContainer) return;
+    DOM.chartBarsContainer.innerHTML = '';
+
+    const maxTotal = Math.max(
+      1,
+      ...state.chartBuckets.map(b => b.clean + b.redacted + b.blocked)
+    );
+
+    state.chartBuckets.forEach((bucket, idx) => {
+      const total = bucket.clean + bucket.redacted + bucket.blocked;
+      const isNow = idx === state.chartBuckets.length - 1;
+      const bar = document.createElement('div');
+      bar.className = `chart-bar ${total === 0 ? 'empty' : ''} ${isNow ? 'is-current' : ''}`;
+
+      if (total > 0) {
+        const hClean = (bucket.clean / maxTotal) * 100;
+        const hRedacted = (bucket.redacted / maxTotal) * 100;
+        const hBlocked = (bucket.blocked / maxTotal) * 100;
+
+        bar.innerHTML = `
+          ${hBlocked > 0 ? `<div class="seg blocked" style="height: ${hBlocked}%"></div>` : ''}
+          ${hRedacted > 0 ? `<div class="seg redacted" style="height: ${hRedacted}%"></div>` : ''}
+          ${hClean > 0 ? `<div class="seg clean" style="height: ${hClean}%"></div>` : ''}
+        `;
+      }
+
+      // Tooltip hover
+      bar.addEventListener('mouseenter', (e) => {
+        const timeLabel = isNow ? 'Current Minute (Now)' : `${30 - idx}m ago`;
+        DOM.chartTooltip.innerHTML = `
+          <div class="chart-tip-time">${timeLabel}</div>
+          <div class="chart-tip-row"><span><i style="background:var(--emerald);"></i>Redacted</span><b>${bucket.redacted}</b></div>
+          <div class="chart-tip-row"><span><i style="background:var(--rose);"></i>Blocked</span><b>${bucket.blocked}</b></div>
+          <div class="chart-tip-row"><span><i style="background:#4a4a56;"></i>Clean</span><b>${bucket.clean}</b></div>
+        `;
+        DOM.chartTooltip.classList.add('show');
+        const rect = bar.getBoundingClientRect();
+        const containerRect = DOM.chartBarsContainer.getBoundingClientRect();
+        DOM.chartTooltip.style.left = `${rect.left - containerRect.left - 40}px`;
+        DOM.chartTooltip.style.bottom = `40px`;
+      });
+
+      bar.addEventListener('mouseleave', () => {
+        DOM.chartTooltip.classList.remove('show');
+      });
+
+      DOM.chartBarsContainer.appendChild(bar);
+    });
+  }
+
+  /**
+   * Playground / Sandbox Inspection
+   */
+  async function executeSandboxInspection() {
+    const text = DOM.sandboxInput.value.trim();
+    if (!text) {
+      showToast('Enter text to inspect', 'info');
+      return;
+    }
+
+    DOM.btnRunSandbox.classList.add('is-loading');
+    const startTime = performance.now();
+
+    try {
+      const res = await fetch('/api/test/sanitize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      });
+
+      const latencyMs = performance.now() - startTime;
+      DOM.sandboxResultMeta.textContent = `${latencyMs.toFixed(1)}ms`;
+
+      if (res.ok) {
+        const data = await res.json();
+        renderSandboxVerdict(data);
+        if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+          if (data.blocked) {
+            pushChartEvent('blocked');
+            updateDashboardMiniFeed({ type: 'blocked', timestamp: Date.now() / 1000, data: { reason: 'Test blocked in sandbox' } });
+          } else if (data.redaction_count > 0) {
+            pushChartEvent('redacted');
+            updateDashboardMiniFeed({ type: 'redaction', timestamp: Date.now() / 1000, data: { redaction_count: data.redaction_count } });
+          } else {
+            pushChartEvent('clean');
+            updateDashboardMiniFeed({ type: 'clean_pass', timestamp: Date.now() / 1000, data: { reason: 'Verified safe prompt' } });
+          }
+        }
+        fetchMetrics();
+      } else {
+        const err = await res.json();
+        renderSandboxVerdict({ blocked: true, violations: [{ entity_type: err.detail || 'Exception' }] });
+      }
+    } catch (e) {
+      console.error('Sandbox error:', e);
+      showToast('Sandbox inspection request failed', 'bad');
+    } finally {
+      DOM.btnRunSandbox.classList.remove('is-loading');
+    }
+  }
+
+  function renderSandboxVerdict(result) {
+    DOM.sandboxVerdictBanner.className = 'verdict';
+
+    if (result.blocked) {
+      DOM.sandboxVerdictBanner.classList.add('blocked');
+      DOM.sandboxResultBadge.textContent = 'FAIL-CLOSED: BLOCKED';
+      DOM.sandboxResultSub.textContent = 'Prohibited secret credentials detected. Prompt halted before dispatch.';
+
+      DOM.sandboxResultBody.innerHTML = `
+        <span class="output-label">RAW PROMPT REJECTED:</span>
+        <div style="color: var(--rose); margin-bottom: 8px;">[BLOCKED BY VEIL GATEWAY POLICY]</div>
+        <div>${escapeHtml(result.original_text || DOM.sandboxInput.value)}</div>
+      `;
+
+      if (result.violations && result.violations.length > 0) {
+        DOM.sandboxFindingsContainer.style.display = 'flex';
+        DOM.sandboxViolationsList.innerHTML = result.violations.map(v => {
+          const type = typeof v === 'object' ? v.entity_type : v;
+          return `<span class="pill bad"><span class="dot bad"></span>${escapeHtml(type)}</span>`;
+        }).join(' ');
+      } else {
+        DOM.sandboxFindingsContainer.style.display = 'none';
+      }
+    } else if (result.redaction_count > 0) {
+      DOM.sandboxVerdictBanner.classList.add('redacted');
+      DOM.sandboxResultBadge.textContent = 'SANITIZED: REDACTED';
+      DOM.sandboxResultSub.textContent = `${result.redaction_count} sensitive tokens replaced with session placeholders.`;
+
+      // Highlight placeholders
+      let outputText = escapeHtml(result.sanitized_text || '');
+      outputText = outputText.replace(/(\[[A-Z_]+_\d+\])/g, '<mark>$1</mark>');
+
+      DOM.sandboxResultBody.innerHTML = `
+        <span class="output-label">SANITIZED OUTBOUND PROMPT:</span>
+        <div>${outputText}</div>
+      `;
+
+      DOM.sandboxFindingsContainer.style.display = 'flex';
+      DOM.sandboxViolationsList.innerHTML = `<span class="pill ok"><span class="dot ok"></span>${result.redaction_count} PII Redacted</span>`;
+    } else {
+      DOM.sandboxVerdictBanner.classList.add('clean');
+      DOM.sandboxResultBadge.textContent = 'CLEAN PASS: ALLOWED';
+      DOM.sandboxResultSub.textContent = 'No secrets or sensitive entities detected. Clean pass-through.';
+
+      DOM.sandboxResultBody.innerHTML = `
+        <span class="output-label">VERIFIED PAYLOAD:</span>
+        <div>${escapeHtml(result.sanitized_text || result.original_text || '')}</div>
+      `;
+      DOM.sandboxFindingsContainer.style.display = 'none';
+    }
+  }
+
+  /**
+   * Enterprise Custom Entity Dictionary
+   */
+  async function fetchCustomEntities() {
+    try {
+      const res = await fetch('/api/custom-entities');
+      if (res.ok) {
+        const data = await res.json();
+        state.customEntities = data.rules || [];
+        if (DOM.navEntitiesCount) {
+          DOM.navEntitiesCount.textContent = state.customEntities.length;
+        }
+        if (DOM.entityRulesCountPill) {
+          DOM.entityRulesCountPill.textContent = `${state.customEntities.length} Rule${state.customEntities.length === 1 ? '' : 's'}`;
+        }
+        renderCustomEntities(state.customEntities);
+      }
+    } catch (err) {
+      console.error('Error fetching custom entities:', err);
+    }
+  }
+
+  function renderCustomEntities(rules) {
+    if (!DOM.entityRulesList) return;
+
+    let filtered = rules || [];
+
+    // Filter by action/status
+    if (state.entityFilter === 'redact') {
+      filtered = filtered.filter(r => r.action === 'REDACT');
+    } else if (state.entityFilter === 'block') {
+      filtered = filtered.filter(r => r.action === 'BLOCK');
+    } else if (state.entityFilter === 'active') {
+      filtered = filtered.filter(r => r.enabled);
+    }
+
+    // Filter by search query
+    if (state.entitySearchQuery) {
+      const q = state.entitySearchQuery.toLowerCase();
+      filtered = filtered.filter(r =>
+        (r.name && r.name.toLowerCase().includes(q)) ||
+        (r.pattern && r.pattern.toLowerCase().includes(q)) ||
+        (r.placeholder_prefix && r.placeholder_prefix.toLowerCase().includes(q)) ||
+        (r.description && r.description.toLowerCase().includes(q))
+      );
+    }
+
+    if (!filtered || filtered.length === 0) {
+      const isFiltered = (rules && rules.length > 0);
+      DOM.entityRulesList.innerHTML = `
+        <div class="empty">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </span>
+          <div class="empty-title">${isFiltered ? 'No Rules Match Filter' : 'No Custom Entities Configured'}</div>
+          <div class="empty-desc">${isFiltered ? 'Try clearing your search query or changing the filter tab above.' : 'Add codenames, client names, or sensitive terms above to automatically scrub them from AI prompts.'}</div>
+        </div>
+      `;
+      return;
+    }
+
+    let html = '<div class="entity-items-container" style="display: flex; flex-direction: column; gap: 10px; padding: 16px;">';
+    filtered.forEach(rule => {
+      const isRedact = rule.action === 'REDACT';
+      const actionBadge = isRedact
+        ? `<span class="pill ok" style="font-size: 11px;"><span class="dot ok"></span>REDACT [${escapeHtml(rule.placeholder_prefix || 'CONFIDENTIAL')}_00X]</span>`
+        : `<span class="pill bad" style="font-size: 11px;"><span class="dot bad"></span>BLOCK (FAIL-CLOSED)</span>`;
+
+      const typeBadge = rule.is_regex
+        ? `<span class="pill warn" style="font-size: 10.5px;">REGEX</span>`
+        : `<span class="pill" style="font-size: 10.5px;">LITERAL</span>`;
+
+      const caseBadge = rule.case_sensitive
+        ? `<span class="pill" style="font-size: 10px; color: var(--amber); border-color: rgba(245, 166, 35, 0.3);">Aa Case Sensitive</span>`
+        : `<span class="pill" style="font-size: 10px; opacity: 0.7;">Case Insensitive</span>`;
+
+      const hitBadge = `<span class="pill info" style="font-size: 10.5px;">${rule.hit_count || 0} hit${rule.hit_count === 1 ? '' : 's'}</span>`;
+
+      html += `
+        <div class="entity-rule-row ${rule.enabled ? '' : 'is-disabled'}" data-id="${escapeHtml(rule.id)}" style="display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 16px; background: var(--bg-surface-2, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.07)); border-radius: 8px; gap: 16px; transition: all 0.2s ease;">
+          <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-size: 13.5px; font-weight: 600; color: var(--text-1);">${escapeHtml(rule.name)}</span>
+              ${typeBadge}
+              ${actionBadge}
+              ${caseBadge}
+              ${hitBadge}
+            </div>
+            ${rule.description ? `<div style="font-size: 12px; color: var(--text-3); font-style: italic;">${escapeHtml(rule.description)}</div>` : ''}
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+              <span style="font-size: 11px; color: var(--text-3); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em;">Pattern:</span>
+              <code style="font-family: var(--font-mono, monospace); font-size: 12px; background: rgba(0,0,0,0.35); padding: 3px 8px; border-radius: 4px; color: var(--accent, #64d2ff); border: 1px solid rgba(255,255,255,0.06);">${escapeHtml(rule.pattern)}</code>
+              <button type="button" class="btn btn-sm btn-copy-pattern" data-pattern="${escapeHtml(rule.pattern)}" title="Copy pattern" style="padding: 2px 6px; height: 22px; font-size: 10.5px;">
+                <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span>
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; align-self: center;">
+            <button class="btn btn-sm btn-toggle-entity ${rule.enabled ? 'btn-primary' : ''}" data-id="${escapeHtml(rule.id)}" title="${rule.enabled ? 'Click to disable' : 'Click to enable'}" style="padding: 5px 12px; font-size: 11.5px;">
+              <span>${rule.enabled ? 'Active' : 'Disabled'}</span>
+            </button>
+            <button class="btn btn-sm btn-danger btn-delete-entity" data-id="${escapeHtml(rule.id)}" data-name="${escapeHtml(rule.name)}" title="Delete rule" style="padding: 5px 9px;">
+              <span class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    DOM.entityRulesList.innerHTML = html;
+    attachEntityActions();
+  }
+
+  function attachEntityActions() {
+    if (!DOM.entityRulesList) return;
+
+    // Copy pattern
+    DOM.entityRulesList.querySelectorAll('.btn-copy-pattern').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pattern = btn.dataset.pattern;
+        copyToClipboard(pattern, `Pattern "${pattern}" copied!`);
+      });
+    });
+
+    // Toggle rule
+    DOM.entityRulesList.querySelectorAll('.btn-toggle-entity').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        try {
+          const res = await fetch(`/api/custom-entities/${id}/toggle`, { method: 'POST' });
+          if (res.ok) {
+            const data = await res.json();
+            showToast(data.enabled ? 'Entity rule enabled' : 'Entity rule disabled', 'ok');
+            fetchCustomEntities();
+          }
+        } catch (e) {
+          showToast('Failed to toggle rule', 'bad');
+        }
+      });
+    });
+
+    // Delete rule
+    DOM.entityRulesList.querySelectorAll('.btn-delete-entity').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const name = btn.dataset.name || 'Rule';
+        if (!confirm(`Delete rule "${name}"?`)) return;
+
+        try {
+          const res = await fetch(`/api/custom-entities/${id}`, { method: 'DELETE' });
+          if (res.ok) {
+            showToast(`Deleted rule "${name}"`, 'info');
+            fetchCustomEntities();
+          }
+        } catch (e) {
+          showToast('Failed to delete rule', 'bad');
+        }
+      });
+    });
+  }
+
+  function setupEntityForm() {
+    if (!DOM.formAddEntity) return;
+
+    DOM.formAddEntity.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = DOM.entityInputName.value.trim();
+      const pattern = DOM.entityInputPattern.value.trim();
+      const prefix = (DOM.entityInputPrefix.value.trim() || 'CONFIDENTIAL').toUpperCase();
+      const action = DOM.entityInputAction.value;
+      const desc = DOM.entityInputDesc ? DOM.entityInputDesc.value.trim() : '';
+      const isRegex = DOM.entityInputRegex ? DOM.entityInputRegex.checked : false;
+      const isCase = DOM.entityInputCase ? DOM.entityInputCase.checked : false;
+
+      if (!name || !pattern) {
+        showToast('Display Name and Match Word/Phrase are required', 'warn');
+        return;
+      }
+
+      DOM.btnSaveEntity.classList.add('is-loading');
+      try {
+        const res = await fetch('/api/custom-entities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            pattern,
+            placeholder_prefix: prefix,
+            action,
+            description: desc,
+            is_regex: isRegex,
+            case_sensitive: isCase,
+            enabled: true
+          })
+        });
+
+        if (res.ok) {
+          DOM.formAddEntity.reset();
+          if (DOM.entityInputPrefix) DOM.entityInputPrefix.value = 'PROJECT';
+          showToast(`Rule "${name}" registered successfully!`, 'ok');
+          if (DOM.entityLiveTestInput) DOM.entityLiveTestInput.value = '';
+          updateLiveEntitySimulator();
+          fetchCustomEntities();
+        } else {
+          const err = await res.json();
+          showToast(`Error: ${err.detail || 'Could not save rule'}`, 'bad');
+        }
+      } catch (err) {
+        showToast('Failed to create custom entity', 'bad');
+      } finally {
+        DOM.btnSaveEntity.classList.remove('is-loading');
+      }
+    });
+  }
+
+  /**
+   * One-Click Quick Presets for Entity Rules
+   */
+  function setupEntityPresets() {
+    const presets = [
+      {
+        btn: DOM.presetEntityProject,
+        name: 'Project Titan',
+        pattern: 'Project Titan',
+        prefix: 'PROJECT',
+        action: 'REDACT',
+        isRegex: false,
+        isCase: false,
+        desc: 'Unreleased Next-Gen Architecture Initiative'
+      },
+      {
+        btn: DOM.presetEntityClient,
+        name: 'Acme Health & Enterprise',
+        pattern: 'Acme Health|Acme Corp|Acme Systems',
+        prefix: 'CLIENT',
+        action: 'REDACT',
+        isRegex: true,
+        isCase: false,
+        desc: 'Healthcare partner NDA protected client terms'
+      },
+      {
+        btn: DOM.presetEntityBlocked,
+        name: 'Root Credential Secret',
+        pattern: 'PROD_MASTER_KEY|ROOT_SSH_BYPASS|SUPERADMIN_SECRET',
+        prefix: 'BLOCKED',
+        action: 'BLOCK',
+        isRegex: true,
+        isCase: true,
+        desc: 'Strict fail-closed root credential leakage prevention'
+      },
+      {
+        btn: DOM.presetEntityNetwork,
+        name: 'Internal Network & Hostnames',
+        pattern: 'corp\\.internal|internal-db|10\\.240\\.\\d+\\.\\d+',
+        prefix: 'INTERNAL_NET',
+        action: 'REDACT',
+        isRegex: true,
+        isCase: false,
+        desc: 'Internal VPC CIDR blocks and cluster hostnames'
+      },
+      {
+        btn: DOM.presetEntityAccount,
+        name: 'Customer Account ID Format',
+        pattern: 'ACC-[0-9]{6,10}',
+        prefix: 'ACCOUNT_ID',
+        action: 'REDACT',
+        isRegex: true,
+        isCase: false,
+        desc: 'Customer PII financial account identifier regex'
+      }
+    ];
+
+    presets.forEach(p => {
+      if (!p.btn) return;
+      p.btn.addEventListener('click', () => {
+        if (DOM.entityInputName) DOM.entityInputName.value = p.name;
+        if (DOM.entityInputPattern) DOM.entityInputPattern.value = p.pattern;
+        if (DOM.entityInputPrefix) DOM.entityInputPrefix.value = p.prefix;
+        if (DOM.entityInputAction) DOM.entityInputAction.value = p.action;
+        if (DOM.entityInputDesc) DOM.entityInputDesc.value = p.desc;
+        if (DOM.entityInputRegex) DOM.entityInputRegex.checked = p.isRegex;
+        if (DOM.entityInputCase) DOM.entityInputCase.checked = p.isCase;
+
+        if (DOM.entityLiveTestInput) {
+          DOM.entityLiveTestInput.value = `Testing security filter for ${p.name.split(' ')[0]} and related assets.`;
+        }
+
+        updateLiveEntitySimulator();
+        showToast(`Loaded "${p.name}" preset template!`, 'info');
+      });
+    });
+  }
+
+  /**
+   * Real-Time Live Entity Rule Simulator
+   */
+  function setupEntitySimulator() {
+    if (!DOM.entityLiveTestInput) return;
+
+    const watched = [
+      DOM.entityLiveTestInput,
+      DOM.entityInputPattern,
+      DOM.entityInputPrefix,
+      DOM.entityInputAction,
+      DOM.entityInputRegex,
+      DOM.entityInputCase
+    ];
+
+    watched.forEach(el => {
+      if (!el) return;
+      el.addEventListener('input', updateLiveEntitySimulator);
+      el.addEventListener('change', updateLiveEntitySimulator);
+    });
+  }
+
+  function updateLiveEntitySimulator() {
+    if (!DOM.entityLiveTestOutput) return;
+
+    const testText = DOM.entityLiveTestInput ? DOM.entityLiveTestInput.value.trim() : '';
+    const pattern = DOM.entityInputPattern ? DOM.entityInputPattern.value.trim() : '';
+    const prefix = DOM.entityInputPrefix ? (DOM.entityInputPrefix.value.trim() || 'CONFIDENTIAL').toUpperCase() : 'CONFIDENTIAL';
+    const action = DOM.entityInputAction ? DOM.entityInputAction.value : 'REDACT';
+    const isRegex = DOM.entityInputRegex ? DOM.entityInputRegex.checked : false;
+    const isCase = DOM.entityInputCase ? DOM.entityInputCase.checked : false;
+
+    if (!testText) {
+      DOM.entityLiveTestOutput.innerHTML = `<span class="muted">Enter text above to preview live tokenization or blocking verdict.</span>`;
+      return;
+    }
+
+    if (!pattern) {
+      DOM.entityLiveTestOutput.innerHTML = `<span class="muted">Enter a Match Word / Phrase above to begin simulation.</span>`;
+      return;
+    }
+
+    try {
+      let reg;
+      const flags = isCase ? 'g' : 'gi';
+      if (isRegex) {
+        reg = new RegExp(pattern, flags);
+      } else {
+        const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        reg = new RegExp('\\b' + escaped + '\\b', flags);
+      }
+
+      const matches = testText.match(reg);
+
+      if (matches && matches.length > 0) {
+        if (action === 'BLOCK') {
+          DOM.entityLiveTestOutput.innerHTML = `
+            <span class="pill bad"><span class="dot bad"></span>FAIL-CLOSED BLOCK</span>
+            <span style="color: var(--rose);">Outbound prompt will be halted immediately. Detected: <strong>"${escapeHtml(matches[0])}"</strong></span>
+          `;
+        } else {
+          let tokenIndex = 1;
+          const sanitized = testText.replace(reg, () => `[${prefix}_00${tokenIndex++}]`);
+          DOM.entityLiveTestOutput.innerHTML = `
+            <span class="pill ok"><span class="dot ok"></span>REDACTED ON WIRE</span>
+            <span style="color: var(--emerald);">Outbound will be sent as: <code style="color: var(--accent); font-weight: 600;">${escapeHtml(sanitized)}</code></span>
+          `;
+        }
+      } else {
+        DOM.entityLiveTestOutput.innerHTML = `
+          <span class="pill info">NO MATCH</span>
+          <span class="muted">Clean prompt. No sensitive entities triggered.</span>
+        `;
+      }
+    } catch (err) {
+      DOM.entityLiveTestOutput.innerHTML = `
+        <span class="pill bad">INVALID PATTERN</span>
+        <span style="color: var(--rose);">${escapeHtml(err.message)}</span>
+      `;
+    }
+  }
+
+  /**
+   * Filter, Search, and Export/Import Rules
+   */
+  function setupEntityFiltersAndExport() {
+    // Search input
+    if (DOM.searchEntityRules) {
+      DOM.searchEntityRules.addEventListener('input', (e) => {
+        state.entitySearchQuery = e.target.value.trim();
+        renderCustomEntities(state.customEntities);
+      });
+    }
+
+    // Filter segmented buttons
+    if (DOM.entityFilterSegmented) {
+      DOM.entityFilterSegmented.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          DOM.entityFilterSegmented.querySelectorAll('button').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+          });
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+          state.entityFilter = btn.dataset.filter;
+          renderCustomEntities(state.customEntities);
+        });
+      });
+    }
+
+    // Export JSON
+    if (DOM.btnExportEntities) {
+      DOM.btnExportEntities.addEventListener('click', () => {
+        if (!state.customEntities || state.customEntities.length === 0) {
+          showToast('No rules to export', 'warn');
+          return;
+        }
+        const jsonStr = JSON.stringify(state.customEntities, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `veil_custom_entities_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Exported custom entity rules to JSON', 'ok');
+      });
+    }
+
+    // Import JSON
+    if (DOM.btnImportEntities && DOM.inputImportEntities) {
+      DOM.btnImportEntities.addEventListener('click', () => {
+        DOM.inputImportEntities.click();
+      });
+
+      DOM.inputImportEntities.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const parsed = JSON.parse(evt.target.result);
+            const rules = Array.isArray(parsed) ? parsed : (parsed.rules || []);
+            if (!Array.isArray(rules) || rules.length === 0) {
+              showToast('Invalid JSON: expected array of rules', 'bad');
+              return;
+            }
+
+            let importedCount = 0;
+            for (const r of rules) {
+              if (r.name && r.pattern) {
+                await fetch('/api/custom-entities', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(r)
+                });
+                importedCount++;
+              }
+            }
+
+            showToast(`Imported ${importedCount} entity rules successfully!`, 'ok');
+            DOM.inputImportEntities.value = '';
+            fetchCustomEntities();
+          } catch (err) {
+            showToast('Failed to import JSON file', 'bad');
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+  }
+
+  /**
+   * System Autostart
+   */
+  async function fetchAutostart() {
+    try {
+      const res = await fetch('/api/system/autostart');
+      if (res.ok) {
+        const data = await res.json();
+        state.autostartEnabled = !!data.enabled;
+        if (DOM.autostartToggle) {
+          DOM.autostartToggle.setAttribute('aria-checked', state.autostartEnabled ? 'true' : 'false');
+        }
+      }
+    } catch (e) {
+      console.error('Fetch autostart error:', e);
+    }
+  }
+
+  async function toggleAutostart() {
+    const newState = !state.autostartEnabled;
+    try {
+      const res = await fetch('/api/system/autostart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newState })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        state.autostartEnabled = !!data.enabled;
+        DOM.autostartToggle.setAttribute('aria-checked', state.autostartEnabled ? 'true' : 'false');
+        showToast(state.autostartEnabled ? 'Autostart enabled on Windows login' : 'Autostart disabled', 'ok');
+      }
+    } catch (e) {
+      showToast('Failed to toggle autostart', 'bad');
+    }
+  }
+
+  /**
+   * Utilities
+   */
+  function copyToClipboard(text, message = 'Copied to clipboard!') {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(message, 'ok');
+    }).catch(() => {
+      showToast('Could not copy to clipboard', 'bad');
+    });
+  }
+
+  function showToast(title, type = 'info', description = '') {
+    if (!DOM.toastsContainer) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    let iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+    if (type === 'ok') {
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    } else if (type === 'bad') {
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+    }
+
+    toast.innerHTML = `
+      <span class="icon">${iconSvg}</span>
+      <div>
+        <div class="toast-title">${escapeHtml(title)}</div>
+        ${description ? `<div class="toast-desc">${escapeHtml(description)}</div>` : ''}
+      </div>
+    `;
+
+    DOM.toastsContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.add('out');
+      setTimeout(() => toast.remove(), 250);
+    }, 3200);
+  }
+
+  function formatNumber(num) {
+    return Number(num).toLocaleString();
+  }
+
+  function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+      .toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Boot on DOM ready
+  window.addEventListener('DOMContentLoaded', init);
+})();

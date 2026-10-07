@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veil — Enterprise AI Privacy Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="shell">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">VEIL</div>
+          <div class="brand-sub">Enterprise AI Privacy Gateway</div>
+        </div>
+      </div>
+
+      <div class="nav-group-label">MONITORING</div>
+      <nav class="nav">
+        <a href="#overview" class="nav-item active" data-view="dashboard" id="nav-dashboard">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+          </span>
+          <span class="label">Overview</span>
+          <span class="kbd">1</span>
+        </a>
+
+        <a href="#clients" class="nav-item" data-view="clients" id="nav-clients">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          </span>
+          <span class="label">AI Clients</span>
+          <span class="nav-count" id="nav-client-count">0/7</span>
+          <span class="kbd">2</span>
+        </a>
+
+        <a href="#telemetry" class="nav-item" data-view="telemetry" id="nav-telemetry">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </span>
+          <span class="label">Telemetry Feed</span>
+          <span class="kbd">3</span>
+        </a>
+      </nav>
+
+      <div class="nav-group-label">VALIDATION & ENGINE</div>
+      <nav class="nav">
+        <a href="#playground" class="nav-item" data-view="playground" id="nav-playground">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </span>
+          <span class="label">Test Playground</span>
+          <span class="kbd">4</span>
+        </a>
+
+        <a href="#entities" class="nav-item" data-view="entities" id="nav-entities">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </span>
+          <span class="label">Entity Dictionary</span>
+          <span class="nav-count" id="nav-entities-count">0</span>
+          <span class="kbd">5</span>
+        </a>
+
+        <a href="#settings" class="nav-item" data-view="settings" id="nav-settings">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </span>
+          <span class="label">System Settings</span>
+          <span class="kbd">6</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <!-- Live Gateway Endpoint Summary -->
+      <div class="gateway-card">
+        <div class="gateway-card-row">
+          <span class="gateway-card-label">LOCAL PROXY</span>
+          <span class="pill ok" id="sidebar-proxy-status">
+            <span class="dot ok live"></span>
+            <span>ACTIVE</span>
+          </span>
+        </div>
+        <div class="gateway-card-row">
+          <span class="gateway-card-value" id="sidebar-proxy-addr">127.0.0.1:8080</span>
+          <button class="btn btn-ghost btn-sm btn-icon" id="btn-copy-proxy" data-tip="Copy Endpoint">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="conn" style="margin-top: 10px; padding: 0 4px;">
+        <span class="dot ok" id="ws-dot"></span>
+        <span id="ws-text">WebSocket Synchronized</span>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <main class="main">
+      <!-- Top Navigation & Global Controls -->
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="topbar-view-title">System Overview</h1>
+          <span class="crumb" id="topbar-view-crumb">Local In-Memory Isolation • Zero Cloud Retention</span>
+        </div>
+
+        <div class="topbar-actions">
+          <!-- Gateway Status Badge -->
+          <div class="pill ok" id="gateway-status-pill">
+            <span class="dot ok live" id="status-pulse-dot"></span>
+            <span id="status-label">GATEWAY ACTIVE</span>
+          </div>
+
+          <!-- Policy Selector (Segmented) -->
+          <div class="segmented sm" id="policy-segmented" role="radiogroup" aria-label="Policy Level">
+            <button type="button" data-policy="STRICT" aria-pressed="true" id="policy-btn-strict">Strict</button>
+            <button type="button" data-policy="BALANCED" aria-pressed="false" id="policy-btn-balanced">Balanced</button>
+            <button type="button" data-policy="PERMISSIVE" aria-pressed="false" id="policy-btn-permissive">Permissive</button>
+          </div>
+          <!-- Hidden select for compatibility -->
+          <select id="policy-select" style="display:none;">
+            <option value="STRICT" selected>STRICT</option>
+            <option value="BALANCED">BALANCED</option>
+            <option value="PERMISSIVE">PERMISSIVE</option>
+          </select>
+
+          <!-- Gateway Pause/Resume Toggle -->
+          <button class="btn btn-sm" id="btn-toggle-gateway" title="Toggle Privacy Gateway State">
+            <span class="icon" id="toggle-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+              </svg>
+            </span>
+            <span id="toggle-text">Pause Gateway</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Content Pane -->
+      <div class="content">
+
+        <!-- VIEW 1: DASHBOARD / OVERVIEW -->
+        <section id="view-dashboard" class="view active">
+          <!-- Gateway Status Hero Panel -->
+          <div class="card status-panel" id="overview-hero-card">
+            <div class="status-main">
+              <div class="status-eyebrow">
+                <span class="dot ok live"></span>
+                <span>REAL-TIME PRIVACY ENFORCEMENT</span>
+              </div>
+              <h2 class="status-title">Zero-Retention Local Defense Active</h2>
+              <p class="status-desc">
+                Outbound developer prompts from registered IDEs and CLI agents are being actively scanned and tokenized through <code>127.0.0.1:8080</code> before reaching external LLM providers.
+              </p>
+              <div class="status-meta">
+                <span>Listening on: <b id="display-proxy-host">127.0.0.1:8080/v1</b></span>
+                <span>Fail-Closed Mode: <b>ENABLED</b></span>
+                <span>Audit Receipts: <b id="display-audit-count">0 cryptographically sealed</b></span>
+              </div>
+            </div>
+
+            <div class="status-controls">
+              <div class="control">
+                <div class="control-row">
+                  <span class="control-label">Gateway Engine</span>
+                  <button class="switch" id="switch-gateway-active" aria-checked="true" aria-label="Toggle Gateway"></button>
+                </div>
+                <p class="control-hint">Toggle between active payload interception and transparent direct pass-through.</p>
+              </div>
+              <div class="control">
+                <div class="control-row">
+                  <span class="control-label">Enforcement Policy</span>
+                  <span class="pill info" id="active-policy-pill">STRICT</span>
+                </div>
+                <p class="control-hint">Block all API keys & credentials fail-closed; tokenize PII with reversible session vault.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 Core Metrics Grid -->
+          <div class="card metrics">
+            <div class="metric">
+              <div class="metric-label">
+                <span class="swatch" style="background: var(--blue);"></span>
+                <span>TOTAL REQUESTS</span>
+              </div>
+              <div class="metric-value num" id="stat-total-requests">0</div>
+              <div class="metric-foot">Outbound prompt dispatches</div>
+            </div>
+
+            <div class="metric">
+              <div class="metric-label">
+                <span class="swatch" style="background: var(--emerald);"></span>
+                <span>TOKENS SANITIZED</span>
+              </div>
+              <div class="metric-value num" id="stat-total-redactions" style="color: var(--emerald);">0</div>
+              <div class="metric-foot">Vault-secured replacements</div>
+            </div>
+
+            <div class="metric">
+              <div class="metric-label">
+                <span class="swatch" style="background: var(--rose);"></span>
+                <span>CREDENTIALS BLOCKED</span>
+              </div>
+              <div class="metric-value num" id="stat-total-blocks" style="color: var(--rose);">0</div>
+              <div class="metric-foot">Fail-closed leaks intercepted</div>
+            </div>
+
+            <div class="metric">
+              <div class="metric-label">
+                <span class="swatch" style="background: var(--amber);"></span>
+                <span>CONNECTED CLIENTS</span>
+              </div>
+              <div class="metric-value num" id="stat-connected-clients">0</div>
+              <div class="metric-foot">Autonomous IDE / agent hooks</div>
+            </div>
+          </div>
+
+          <!-- Interactive Throughput Activity Chart -->
+          <div class="card chart-card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Interception Activity Throughput</div>
+                <div class="card-sub">Live events grouped in rolling 1-minute time windows</div>
+              </div>
+              <div class="chart-legend">
+                <span><i style="background: #3a3a42;"></i> Clean Pass</span>
+                <span><i style="background: var(--emerald);"></i> Redacted</span>
+                <span><i style="background: var(--rose);"></i> Blocked</span>
+              </div>
+            </div>
+            <div class="chart" id="throughput-chart">
+              <div class="chart-grid">
+                <div></div>
+                <div></div>
+                <div></div>
+              </div>
+              <div class="chart-bars" id="chart-bars-container">
+                <!-- Dynamically generated bars -->
+              </div>
+              <div class="chart-axis">
+                <span>30m ago</span>
+                <span>15m ago</span>
+                <span>Now <span class="dot ok live" style="display:inline-block; margin-left:3px; vertical-align:middle;"></span></span>
+              </div>
+              <div class="chart-tip" id="chart-tooltip"></div>
+            </div>
+          </div>
+
+          <!-- Split Preview: Recent Events & Connected Clients -->
+          <div class="split">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Live Security Stream</div>
+                  <div class="card-sub">Latest outbound privacy events</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btn-view-all-telemetry">View All</button>
+              </div>
+              <ul class="mini-feed" id="dashboard-mini-feed">
+                <li class="empty-feed-placeholder">
+                  <div class="empty">
+                    <span class="icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                    </span>
+                    <div class="empty-title">Awaiting Outbound Traffic</div>
+                    <div class="empty-desc">Send prompts through an attached IDE or test the inspection engine in the playground.</div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Configured Clients</div>
+                  <div class="card-sub">Local environment detection status</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="btn-view-all-clients">Manage</button>
+              </div>
+              <ul class="client-mini" id="dashboard-mini-clients">
+                <!-- Populated dynamically -->
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: AI CLIENTS -->
+        <section id="view-clients" class="view">
+          <div class="section-head">
+            <div>
+              <h2>AI Client Environments</h2>
+              <p>Autonomous zero-corruption configuration injection with 1-click rollback backups.</p>
+            </div>
+            <div class="client-summary">
+              <button class="btn btn-sm" id="btn-rescan-clients">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </span>
+                <span>Rescan Clients</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card client-list" id="clients-container">
+            <!-- Dynamic client cards rendered by JS -->
+            <div class="skeleton-row">
+              <div class="sk box"></div>
+              <div>
+                <div class="sk w60"></div>
+                <div class="sk w40"></div>
+              </div>
+              <div class="sk" style="height: 28px; width: 80px;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: TELEMETRY FEED -->
+        <section id="view-telemetry" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Zero-Retention Audit Ledger & Telemetry</h2>
+              <p>Cryptographic receipts and inspection latency for every intercepted LLM interaction.</p>
+            </div>
+            <div class="topbar-actions">
+              <button class="btn btn-sm btn-ghost" id="btn-clear-feed">Clear Stream</button>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <div class="segmented sm" id="feed-filters">
+                <button type="button" class="active" data-filter="all" aria-pressed="true">All Events</button>
+                <button type="button" data-filter="redaction" aria-pressed="false">Redactions</button>
+                <button type="button" data-filter="blocked" aria-pressed="false">Blocked</button>
+                <button type="button" data-filter="client" aria-pressed="false">Clients</button>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <div class="search">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+                <input type="text" class="input" id="search-telemetry" placeholder="Filter by model, rule, ID...">
+              </div>
+            </div>
+          </div>
+
+          <div class="card log" id="telemetry-terminal">
+            <div class="log-head">
+              <div>TIMESTAMP</div>
+              <div>EVENT</div>
+              <div>DETAILS & VIOLATIONS</div>
+              <div>TARGET / MODEL</div>
+              <div class="r">LATENCY</div>
+            </div>
+            <div class="log-body" id="feed-items">
+              <div class="empty" id="feed-empty-state">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                </span>
+                <div class="empty-title">Telemetry Stream Initialized</div>
+                <div class="empty-desc">Listening to Veil's local event bus. Inspecting outbound requests in real time.</div>
+              </div>
+            </div>
+            <div class="log-foot">
+              <span id="log-count-summary">0 events recorded</span>
+              <span class="mono muted">BUFFER: 200 IN-MEMORY</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: PLAYGROUND / SANDBOX -->
+        <section id="view-playground" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Inspection Sandbox</h2>
+              <p>Simulate outbound developer prompts through Veil's tokenizers and heuristic classifiers.</p>
+            </div>
+            <div class="pg-presets">
+              <button class="chip" id="preset-secret">Insert AWS Secret Key</button>
+              <button class="chip" id="preset-pii">Insert Customer PII</button>
+              <button class="chip" id="preset-clean">Clean Function</button>
+            </div>
+          </div>
+
+          <div class="pg">
+            <!-- Left: Input Editor -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Prompt Payload</div>
+                <span class="mono muted" id="input-char-count">0 chars</span>
+              </div>
+              <textarea class="editor" id="sandbox-input" placeholder="Type or paste any prompt containing credentials, JWTs, emails, phone numbers, or code..." spellcheck="false"></textarea>
+              <div class="pg-foot">
+                <div class="hint">
+                  <span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> to inspect
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-run-sandbox">
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </span>
+                  <span>Inspect Prompt</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right: Result Verdict -->
+            <div class="card" id="sandbox-result-card">
+              <div class="verdict clean" id="sandbox-verdict-banner">
+                <div class="verdict-icon">
+                  <span class="icon" id="verdict-icon-svg">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                  </span>
+                </div>
+                <div>
+                  <div class="verdict-title" id="sandbox-result-badge">READY TO INSPECT</div>
+                  <div class="verdict-sub" id="sandbox-result-sub">Run a test prompt to observe policy evaluation.</div>
+                </div>
+                <div class="verdict-meta" id="sandbox-result-meta">-- ms</div>
+              </div>
+
+              <div class="output" id="sandbox-result-body">
+                <span class="output-label">OUTPUT PREVIEW:</span>
+                <span class="muted">No inspection performed yet. Click "Inspect Prompt" or choose a preset.</span>
+              </div>
+
+              <div class="findings" id="sandbox-findings-container" style="display:none;">
+                <span class="findings-label">VIOLATIONS:</span>
+                <div id="sandbox-violations-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 5: ENTITY DICTIONARY & BLACKLIST -->
+        <section id="view-entities" class="view">
+          <div class="section-head">
+            <div>
+              <h2>Enterprise Entity Dictionary & Custom Blacklist</h2>
+              <p>Define proprietary project codenames, client names, and regex rules for automatic tokenization or fail-closed blocking.</p>
+            </div>
+          </div>
+
+          <!-- Educational Guide Banner -->
+          <div class="entity-guide-banner">
+            <div class="guide-step-card">
+              <div class="guide-step-header">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 13px; height: 13px;">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+                <span>Step 1 • Intercept</span>
+              </div>
+              <div class="guide-step-title">1. Define Sensitive Terms</div>
+              <div class="guide-step-desc">Specify unreleased codenames, client lists, or custom regex ID patterns to catch in outbound prompts.</div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="guide-step-header" style="color: var(--accent, #64d2ff);">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 13px; height: 13px;">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </span>
+                <span>Step 2 • Neutralize</span>
+              </div>
+              <div class="guide-step-title">2. Choose Guardrail Action</div>
+              <div class="guide-step-desc">Select <strong>REDACT</strong> for zero-leak reversible tokenization or <strong>BLOCK</strong> for immediate fail-closed rejection.</div>
+            </div>
+
+            <div class="guide-step-card">
+              <div class="guide-step-header" style="color: var(--amber);">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 13px; height: 13px;">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                </span>
+                <span>Step 3 • Restore</span>
+              </div>
+              <div class="guide-step-title">3. Reversible Decryption</div>
+              <div class="guide-step-desc">Session vault automatically swaps placeholders back to plain text when the AI model streams its reply.</div>
+            </div>
+          </div>
+
+          <!-- Add Entity Form Card -->
+          <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Register Confidential Entity Rule</div>
+                <div class="card-sub">Outbound prompts matching this rule will be sanitized with a dedicated session vault placeholder or blocked.</div>
+              </div>
+            </div>
+            <div class="card-body">
+
+              <!-- Quick Presets Bar -->
+              <div class="preset-bar">
+                <span class="preset-label">Quick Presets:</span>
+                <button type="button" class="preset-chip" id="preset-entity-project" title="Quickly fill Project Codename example">
+                  <span>🏷️ Project Codename</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-entity-client" title="Quickly fill Client / Company regex example">
+                  <span>🏢 Client / Company</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-entity-blocked" title="Quickly fill Prohibited Secret blacklist example">
+                  <span>🔒 Prohibited Credential</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-entity-network" title="Quickly fill Internal Network / IP example">
+                  <span>🌐 Internal Network</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-entity-account" title="Quickly fill Customer ID format example">
+                  <span>💳 Custom Account ID</span>
+                </button>
+              </div>
+
+              <form id="form-add-entity">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                  
+                  <!-- Field 1: Rule Name -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="entity-input-name">Display Name</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">A friendly name so your team knows what this rule protects (e.g. <strong>Project Titan</strong> or <strong>Acme Corp</strong>). Does not affect pattern matching.</div>
+                      </div>
+                    </div>
+                    <input type="text" class="input" id="entity-input-name" placeholder="e.g. Project Titan" style="width: 100%;" required>
+                  </div>
+
+                  <!-- Field 2: Match Pattern -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="entity-input-pattern">Match Word / Phrase</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">The exact sensitive text or regex to catch in outbound prompts (e.g. <strong>Project Titan</strong> or <strong>Acme Corp|Acme Health</strong>). Whenever this appears in a prompt, Veil catches it.</div>
+                      </div>
+                    </div>
+                    <input type="text" class="input" id="entity-input-pattern" placeholder="e.g. Project Titan" style="width: 100%;" required>
+                  </div>
+
+                  <!-- Field 3: Placeholder Prefix -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="entity-input-prefix">Placeholder Prefix</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">Used in Redact mode. Veil replaces the secret with a token like <strong>[PROJECT_001]</strong> before sending to AI. When AI answers, Veil automatically decrypts it back.</div>
+                      </div>
+                    </div>
+                    <input type="text" class="input" id="entity-input-prefix" placeholder="e.g. PROJECT (renders [PROJECT_001])" value="PROJECT" style="width: 100%;" required>
+                  </div>
+
+                  <!-- Field 4: Enforcement Action -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="entity-input-action">Enforcement Action</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup"><strong>• REDACT (Recommended):</strong> Hides the word with a placeholder so AI never sees it, then restores it in replies.<br><strong>• BLOCK:</strong> Immediately halts prompt before leaving your machine.</div>
+                      </div>
+                    </div>
+                    <select class="input" id="entity-input-action" style="width: 100%; cursor: pointer;">
+                      <option value="REDACT" selected>REDACT (Reversible Tokenization)</option>
+                      <option value="BLOCK">BLOCK (Fail-Closed Rejection)</option>
+                    </select>
+                  </div>
+
+                  <!-- Field 5: Internal Description / Notes -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="entity-input-desc">Internal Notes (Optional)</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">Optional context or classification for your records (e.g. <strong>Confidential M&A target under NDA 2026</strong>). Stored locally on disk.</div>
+                      </div>
+                    </div>
+                    <input type="text" class="input" id="entity-input-desc" placeholder="e.g. NDA signed Q3 2026" style="width: 100%;">
+                  </div>
+                </div>
+
+                <!-- Checkboxes Row -->
+                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="entity-input-regex" style="cursor: pointer;">
+                    <label for="entity-input-regex" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--text-2);">
+                      <span>Regular Expression</span>
+                    </label>
+                    <div class="ui-tooltip-wrap">
+                      <span class="ui-tooltip-icon" tabindex="0">?</span>
+                      <div class="ui-tooltip-popup">Check this ON only if your pattern uses regex symbols (like <strong>|</strong> for OR, or <strong>\d+</strong> for digits). Leave OFF for plain words.</div>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="entity-input-case" style="cursor: pointer;">
+                    <label for="entity-input-case" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--text-2);">
+                      <span>Case Sensitive</span>
+                    </label>
+                    <div class="ui-tooltip-wrap">
+                      <span class="ui-tooltip-icon" tabindex="0">?</span>
+                      <div class="ui-tooltip-popup">Check ON to match exact upper/lower case only. When OFF (recommended), typing <strong>titan</strong>, <strong>Titan</strong>, or <strong>TITAN</strong> will all be caught.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Interactive Live Simulator -->
+                <div class="entity-simulator-box">
+                  <div class="simulator-head">
+                    <span class="simulator-title">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; color: var(--emerald);">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                      <span>Live Rule Simulator (Test Before Saving)</span>
+                    </span>
+                    <span class="muted" style="font-size: 11px;">Type below to preview how Veil neutralizes this text in real time</span>
+                  </div>
+                  <input type="text" class="input" id="entity-live-test-input" placeholder="Type a test prompt here (e.g. Please analyze confidential specs for Project Titan)..." style="width: 100%;">
+                  <div class="simulator-result" id="entity-live-test-output">
+                    <span class="muted">Enter text above to preview live tokenization or blocking verdict.</span>
+                  </div>
+                </div>
+
+                <!-- Form Submit Button -->
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                  <button type="submit" class="btn btn-primary" id="btn-save-entity" style="padding: 0 20px;">
+                    <span class="icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </span>
+                    <span>Register Entity Rule</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Active Entities Table Card -->
+          <div class="card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div class="card-title">Configured Entity Rules</div>
+                <div class="card-sub">Active rules applied during prompt inspection and stream restoration</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <!-- Filter segmented -->
+                <div class="segmented sm" id="entity-filter-segmented">
+                  <button type="button" class="active" data-filter="all" aria-pressed="true">All</button>
+                  <button type="button" data-filter="redact" aria-pressed="false">Redact</button>
+                  <button type="button" data-filter="block" aria-pressed="false">Block</button>
+                  <button type="button" data-filter="active" aria-pressed="false">Active Only</button>
+                </div>
+                <!-- Search -->
+                <div class="search" style="width: 180px;">
+                  <span class="search-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </span>
+                  <input type="text" class="input" id="search-entity-rules" placeholder="Filter rules...">
+                </div>
+                <button type="button" class="btn btn-sm" id="btn-export-entities" title="Export configured rules as JSON">
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  </span>
+                  <span>Export</span>
+                </button>
+                <button type="button" class="btn btn-sm" id="btn-import-entities" title="Import enterprise JSON rules">
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  </span>
+                  <span>Import</span>
+                </button>
+                <input type="file" id="input-import-entities" accept=".json" style="display: none;">
+                <span class="pill info" id="entity-rules-count-pill">0 Rules</span>
+              </div>
+            </div>
+            <div id="entity-rules-list">
+              <div class="empty">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                  </svg>
+                </span>
+                <div class="empty-title">No Custom Entities Configured</div>
+                <div class="empty-desc">Add codenames, client names, or sensitive terms above to automatically scrub them from AI prompts.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 6: SETTINGS -->
+        <section id="view-settings" class="view">
+          <div class="section-head">
+            <div>
+              <h2>System Settings</h2>
+              <p>Host integration, local port bindings, and cryptographic ledger policies.</p>
+            </div>
+          </div>
+
+          <div class="card settings">
+            <div class="setting">
+              <div>
+                <div class="setting-title">Launch on Windows Startup</div>
+                <div class="setting-desc">Automatically launch Veil quietly into the Windows system tray on login.</div>
+              </div>
+              <button class="switch" id="autostart-toggle" aria-checked="false" aria-label="Toggle Autostart"></button>
+            </div>
+
+            <div class="setting">
+              <div>
+                <div class="setting-title">Local Proxy Binding</div>
+                <div class="setting-desc">The local loopback port where IDE clients route their completions and messages.</div>
+              </div>
+              <div class="copy-field">
+                <span>http://127.0.0.1:8080/v1</span>
+                <button class="btn btn-ghost btn-sm btn-icon" id="btn-copy-settings-proxy" title="Copy URL">
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div class="setting">
+              <div>
+                <div class="setting-title">Telemetry Ledger Storage</div>
+                <div class="setting-desc">Zero retention architecture: raw prompts are processed strictly in volatile RAM and never committed to disk.</div>
+              </div>
+              <span class="pill ok">IN-MEMORY ISOLATION</span>
+            </div>
+
+            <div class="setting">
+              <div>
+                <div class="setting-title">About Veil</div>
+                <div class="setting-desc">Enterprise Local AI Privacy & Security Gateway. Version 0.1.0-native.</div>
+              </div>
+              <span class="mono muted">v0.1.0</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toasts" id="toasts-container"></div>
+
+  <!-- Main JavaScript Bundle -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
