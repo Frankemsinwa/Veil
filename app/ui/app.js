@@ -25,7 +25,11 @@
     eventsLog: [],
     customEntities: [],
     entityFilter: 'all',
-    entitySearchQuery: ''
+    entitySearchQuery: '',
+    vectorEntries: [],
+    vectorCategoryFilter: 'ALL',
+    vectorSearchQuery: '',
+    vectorMode: 'single'
   };
 
   // DOM Elements
@@ -134,7 +138,47 @@
     entityFilterSegmented: document.getElementById('entity-filter-segmented'),
     btnExportEntities: document.getElementById('btn-export-entities'),
     btnImportEntities: document.getElementById('btn-import-entities'),
-    inputImportEntities: document.getElementById('input-import-entities')
+    inputImportEntities: document.getElementById('input-import-entities'),
+
+    // Semantic Vector Vault
+    navVectorVault: document.getElementById('nav-vector-vault'),
+    navVectorsCount: document.getElementById('nav-vectors-count'),
+    vectorHealthPill: document.getElementById('vector-health-pill'),
+    vectorHealthDot: document.getElementById('vector-health-dot'),
+    vectorHealthLabel: document.getElementById('vector-health-label'),
+    statVaultCount: document.getElementById('stat-vault-count'),
+    statVaultHits: document.getElementById('stat-vault-hits'),
+    vectorModeSegmented: document.getElementById('vector-mode-segmented'),
+    btnModeSingle: document.getElementById('btn-mode-single'),
+    btnModeDocument: document.getElementById('btn-mode-document'),
+    vectorDocOptions: document.getElementById('vector-doc-options'),
+    vectorDocWindow: document.getElementById('vector-doc-window'),
+    vectorDocStride: document.getElementById('vector-doc-stride'),
+    presetVecMa: document.getElementById('preset-vec-ma'),
+    presetVecFinancial: document.getElementById('preset-vec-financial'),
+    presetVecInfra: document.getElementById('preset-vec-infra'),
+    presetVecHr: document.getElementById('preset-vec-hr'),
+    formAddVector: document.getElementById('form-add-vector'),
+    vectorInputTitle: document.getElementById('vector-input-title'),
+    vectorInputCategory: document.getElementById('vector-input-category'),
+    vectorInputAction: document.getElementById('vector-input-action'),
+    vectorInputThreshold: document.getElementById('vector-input-threshold'),
+    vectorThresholdBadge: document.getElementById('vector-threshold-badge'),
+    vectorInputText: document.getElementById('vector-input-text'),
+    vectorTextCharCount: document.getElementById('vector-text-char-count'),
+    btnSaveVector: document.getElementById('btn-save-vector'),
+    btnSaveVectorText: document.getElementById('btn-save-vector-text'),
+    vectorLiveTestInput: document.getElementById('vector-live-test-input'),
+    btnTestVectorSim: document.getElementById('btn-test-vector-sim'),
+    vectorLiveTestOutput: document.getElementById('vector-live-test-output'),
+    vectorTestVerdictPill: document.getElementById('vector-test-verdict-pill'),
+    vectorTestLatencyText: document.getElementById('vector-test-latency-text'),
+    vectorTestGaugeBar: document.getElementById('vector-test-gauge-bar'),
+    vectorTestDetails: document.getElementById('vector-test-details'),
+    vectorCategorySegmented: document.getElementById('vector-category-segmented'),
+    searchVectorRules: document.getElementById('search-vector-rules'),
+    vectorRulesCountPill: document.getElementById('vector-rules-count-pill'),
+    vectorRulesList: document.getElementById('vector-rules-list')
   };
 
   // SVGs for AI Clients
@@ -171,6 +215,10 @@
       title: 'Enterprise Entity Dictionary & Blacklist',
       crumb: 'Custom Codenames, Client Lists & Regex Privacy Rules'
     },
+    'vector-vault': {
+      title: 'Semantic Guardrails & Knowledge Vault',
+      crumb: 'On-Device Quantized ONNX Vector Defense • Zero Cloud Egress'
+    },
     settings: {
       title: 'System Settings',
       crumb: 'Host Integration & Port Management'
@@ -189,6 +237,8 @@
     fetchClients();
     fetchMetrics();
     fetchAutostart();
+    fetchVectorEntries();
+    setupVectorVaultController();
     fetchCustomEntities();
     setupEntityForm();
     setupEntityPresets();
@@ -372,7 +422,8 @@
       if (e.key === '3') switchView('telemetry');
       if (e.key === '4') switchView('playground');
       if (e.key === '5') switchView('entities');
-      if (e.key === '6') switchView('settings');
+      if (e.key === '6') switchView('vector-vault');
+      if (e.key === '7') switchView('settings');
     });
   }
 
@@ -1645,6 +1696,493 @@
       }
     } catch (e) {
       showToast('Failed to toggle autostart', 'bad');
+    }
+  }
+
+  /**
+   * ==========================================================================
+   * Semantic Knowledge Vector Vault Controller (Phase 4)
+   * ==========================================================================
+   */
+  async function fetchVectorEntries() {
+    try {
+      const res = await fetch('/api/knowledge-vault');
+      if (res.ok) {
+        const data = await res.json();
+        state.vectorEntries = data.entries || [];
+        updateVectorVaultUI(data);
+      }
+    } catch (err) {
+      console.error('Error fetching knowledge vector entries:', err);
+    }
+  }
+
+  function updateVectorVaultUI(meta = {}) {
+    const total = state.vectorEntries.length;
+    const activeCount = state.vectorEntries.filter(e => e.enabled).length;
+    const totalHits = state.vectorEntries.reduce((acc, e) => acc + (e.hit_count || 0), 0);
+
+    if (DOM.navVectorsCount) {
+      DOM.navVectorsCount.textContent = total;
+    }
+    if (DOM.vectorRulesCountPill) {
+      DOM.vectorRulesCountPill.textContent = `${total} Entr${total === 1 ? 'y' : 'ies'}`;
+    }
+    if (DOM.statVaultCount) {
+      DOM.statVaultCount.textContent = `${activeCount} item${activeCount === 1 ? '' : 's'}`;
+    }
+    if (DOM.statVaultHits) {
+      DOM.statVaultHits.textContent = `${totalHits} Breach${totalHits === 1 ? '' : 'es'} Blocked`;
+    }
+
+    renderVectorEntries();
+  }
+
+  function renderVectorEntries() {
+    if (!DOM.vectorRulesList) return;
+
+    let filtered = [...state.vectorEntries];
+
+    // Filter by Category
+    if (state.vectorCategoryFilter && state.vectorCategoryFilter !== 'ALL') {
+      filtered = filtered.filter(e => (e.category || '').toUpperCase() === state.vectorCategoryFilter);
+    }
+
+    // Filter by Search Query
+    if (state.vectorSearchQuery) {
+      const q = state.vectorSearchQuery.toLowerCase();
+      filtered = filtered.filter(e =>
+        (e.title || '').toLowerCase().includes(q) ||
+        (e.text || '').toLowerCase().includes(q) ||
+        (e.category || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (filtered.length === 0) {
+      DOM.vectorRulesList.innerHTML = `
+        <div class="empty">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </span>
+          <div class="empty-title">${state.vectorEntries.length === 0 ? 'No Knowledge Vectors Registered' : 'No Matching Vectors'}</div>
+          <div class="empty-desc">${state.vectorEntries.length === 0 ? 'Ingest sensitive documents or secrets above to guard against unauthorized leakage or AI training extraction.' : 'Try adjusting your search or category filter.'}</div>
+        </div>
+      `;
+      return;
+    }
+
+    const html = filtered.map(entry => {
+      const isBlock = entry.action === 'BLOCK';
+      const actionPill = isBlock
+        ? `<span class="pill bad" style="font-size: 10.5px;">BLOCK</span>`
+        : `<span class="pill warn" style="font-size: 10.5px;">REDACT</span>`;
+
+      const thresholdVal = entry.threshold_override ? entry.threshold_override.toFixed(2) : 'Default (0.75)';
+      const dateStr = entry.created_at ? new Date(entry.created_at * 1000).toLocaleDateString() : 'Active';
+
+      return `
+        <div class="vector-rule-row" data-id="${escapeHtml(entry.id)}">
+          <div class="vector-rule-main">
+            <div class="vector-rule-title-row">
+              <span class="vector-rule-title">${escapeHtml(entry.title)}</span>
+              <span class="tag">${escapeHtml(entry.category)}</span>
+              ${actionPill}
+              ${entry.hit_count > 0 ? `<span class="pill info" style="font-size: 10.5px;">${entry.hit_count} Hit${entry.hit_count === 1 ? '' : 's'}</span>` : ''}
+            </div>
+            <div class="vector-rule-text">${escapeHtml(entry.text)}</div>
+            <div class="vector-rule-meta">
+              <span>Threshold: <b style="color: var(--text);">${thresholdVal}</b></span>
+              <span>Ingested: ${dateStr}</span>
+              <span>ID: <code style="font-size: 10.5px;">${escapeHtml(entry.id.substring(0, 8))}</code></span>
+            </div>
+          </div>
+          <div class="vector-rule-actions">
+            <label class="switch sm" title="Toggle active status">
+              <input type="checkbox" class="vector-toggle-switch" data-id="${escapeHtml(entry.id)}" ${entry.enabled ? 'checked' : ''}>
+              <span class="slider"></span>
+            </label>
+            <button class="btn btn-ghost btn-sm btn-icon btn-test-vector-item" data-id="${escapeHtml(entry.id)}" title="Simulate Prompt Against This Vector">
+              <span class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </span>
+            </button>
+            <button class="btn btn-ghost btn-sm btn-icon btn-delete-vector-item" data-id="${escapeHtml(entry.id)}" title="Delete Knowledge Vector">
+              <span class="icon" style="color: var(--rose);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    DOM.vectorRulesList.innerHTML = html;
+
+    // Attach row event listeners
+    DOM.vectorRulesList.querySelectorAll('.vector-toggle-switch').forEach(sw => {
+      sw.addEventListener('change', () => {
+        const id = sw.dataset.id;
+        toggleVectorEntry(id);
+      });
+    });
+
+    DOM.vectorRulesList.querySelectorAll('.btn-delete-vector-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        deleteVectorEntry(id);
+      });
+    });
+
+    DOM.vectorRulesList.querySelectorAll('.btn-test-vector-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const entry = state.vectorEntries.find(e => e.id === id);
+        if (entry && DOM.vectorLiveTestInput) {
+          DOM.vectorLiveTestInput.value = entry.text.substring(0, 120);
+          testVectorSimilarity();
+        }
+      });
+    });
+  }
+
+  async function toggleVectorEntry(id) {
+    try {
+      const res = await fetch(`/api/knowledge-vault/${id}/toggle`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        const idx = state.vectorEntries.findIndex(e => e.id === id);
+        if (idx !== -1) {
+          state.vectorEntries[idx] = data.entry;
+        }
+        updateVectorVaultUI();
+        showToast(`Rule ${data.entry.enabled ? 'activated' : 'deactivated'}`, 'info');
+      }
+    } catch (err) {
+      showToast('Failed to toggle vector rule', 'bad');
+    }
+  }
+
+  async function deleteVectorEntry(id) {
+    if (!confirm('Are you sure you want to delete this protected vector entry?')) return;
+    try {
+      const res = await fetch(`/api/knowledge-vault/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        state.vectorEntries = state.vectorEntries.filter(e => e.id !== id);
+        updateVectorVaultUI();
+        showToast('Knowledge vector removed from vault', 'ok');
+      }
+    } catch (err) {
+      showToast('Failed to delete knowledge vector', 'bad');
+    }
+  }
+
+  function setupVectorVaultController() {
+    // Mode Switch (Single vs Document)
+    if (DOM.btnModeSingle && DOM.btnModeDocument) {
+      DOM.btnModeSingle.addEventListener('click', () => {
+        DOM.btnModeSingle.classList.add('active');
+        DOM.btnModeSingle.setAttribute('aria-pressed', 'true');
+        DOM.btnModeDocument.classList.remove('active');
+        DOM.btnModeDocument.setAttribute('aria-pressed', 'false');
+        state.vectorMode = 'single';
+        if (DOM.vectorDocOptions) DOM.vectorDocOptions.style.display = 'none';
+        if (DOM.btnSaveVectorText) DOM.btnSaveVectorText.textContent = 'Ingest Into Vector Vault';
+      });
+
+      DOM.btnModeDocument.addEventListener('click', () => {
+        DOM.btnModeDocument.classList.add('active');
+        DOM.btnModeDocument.setAttribute('aria-pressed', 'true');
+        DOM.btnModeSingle.classList.remove('active');
+        DOM.btnModeSingle.setAttribute('aria-pressed', 'false');
+        state.vectorMode = 'document';
+        if (DOM.vectorDocOptions) DOM.vectorDocOptions.style.display = 'block';
+        if (DOM.btnSaveVectorText) DOM.btnSaveVectorText.textContent = 'Chunk & Ingest Document Memos';
+      });
+    }
+
+    // Threshold Slider update
+    if (DOM.vectorInputThreshold && DOM.vectorThresholdBadge) {
+      DOM.vectorInputThreshold.addEventListener('input', (e) => {
+        DOM.vectorThresholdBadge.textContent = parseFloat(e.target.value).toFixed(2);
+      });
+    }
+
+    // Char count update
+    if (DOM.vectorInputText && DOM.vectorTextCharCount) {
+      DOM.vectorInputText.addEventListener('input', () => {
+        const len = DOM.vectorInputText.value.length;
+        DOM.vectorTextCharCount.textContent = `${len} char${len === 1 ? '' : 's'}`;
+      });
+    }
+
+    // Presets
+    setupVectorPresets();
+
+    // Form Submit
+    if (DOM.formAddVector) {
+      DOM.formAddVector.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = DOM.vectorInputTitle.value.trim();
+        const category = DOM.vectorInputCategory.value;
+        const action = DOM.vectorInputAction.value;
+        const text = DOM.vectorInputText.value.trim();
+        const threshold = parseFloat(DOM.vectorInputThreshold.value);
+
+        if (!title || !text) return;
+
+        DOM.btnSaveVector.classList.add('is-loading');
+
+        try {
+          if (state.vectorMode === 'document') {
+            const windowSize = parseInt(DOM.vectorDocWindow ? DOM.vectorDocWindow.value : '2', 10);
+            const stride = parseInt(DOM.vectorDocStride ? DOM.vectorDocStride.value : '1', 10);
+            const res = await fetch('/api/knowledge-vault/embed-document', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title,
+                document_text: text,
+                category,
+                action,
+                threshold_override: threshold,
+                window_size_sentences: windowSize,
+                stride
+              })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              showToast(`Ingested document into ${data.created_count} sliding vector chunks!`, 'ok');
+              DOM.vectorInputText.value = '';
+              DOM.vectorInputTitle.value = '';
+              fetchVectorEntries();
+            } else {
+              const err = await res.json();
+              showToast(`Error: ${err.detail || 'Failed to embed document'}`, 'bad');
+            }
+          } else {
+            const res = await fetch('/api/knowledge-vault/entry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title,
+                text,
+                category,
+                action,
+                threshold_override: threshold
+              })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              showToast(`Ingested "${title}" into vector vault!`, 'ok');
+              DOM.vectorInputText.value = '';
+              DOM.vectorInputTitle.value = '';
+              fetchVectorEntries();
+            } else {
+              const err = await res.json();
+              showToast(`Error: ${err.detail || 'Failed to add entry'}`, 'bad');
+            }
+          }
+        } catch (err) {
+          showToast('Failed to communicate with vector vault API', 'bad');
+        } finally {
+          DOM.btnSaveVector.classList.remove('is-loading');
+        }
+      });
+    }
+
+    // Similarity Sandbox Test Button
+    if (DOM.btnTestVectorSim) {
+      DOM.btnTestVectorSim.addEventListener('click', testVectorSimilarity);
+    }
+    if (DOM.vectorLiveTestInput) {
+      DOM.vectorLiveTestInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          testVectorSimilarity();
+        }
+      });
+    }
+
+    // Category Segmented Filter
+    if (DOM.vectorCategorySegmented) {
+      DOM.vectorCategorySegmented.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          DOM.vectorCategorySegmented.querySelectorAll('button').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+          });
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+          state.vectorCategoryFilter = btn.dataset.cat;
+          renderVectorEntries();
+        });
+      });
+    }
+
+    // Search Input
+    if (DOM.searchVectorRules) {
+      DOM.searchVectorRules.addEventListener('input', (e) => {
+        state.vectorSearchQuery = e.target.value.toLowerCase().trim();
+        renderVectorEntries();
+      });
+    }
+  }
+
+  function setupVectorPresets() {
+    const presets = [
+      {
+        btn: DOM.presetVecMa,
+        title: 'Project Apex Buyout Terms',
+        category: 'PROPRIETARY',
+        action: 'BLOCK',
+        threshold: 0.70,
+        text: 'Confidential buyout discussions with Apex Corporation valuing the entity at $4.2 billion with 30 days exclusivity.'
+      },
+      {
+        btn: DOM.presetVecFinancial,
+        title: 'Unreleased Q3 Margin Compression',
+        category: 'FINANCIAL',
+        action: 'BLOCK',
+        threshold: 0.65,
+        text: 'Internal board forecast projects Q3 operating margin compression of 400 basis points due to APAC component supply delays.'
+      },
+      {
+        btn: DOM.presetVecInfra,
+        title: 'Production Database Cluster Spec',
+        category: 'INFRASTRUCTURE',
+        action: 'REDACT',
+        threshold: 0.75,
+        text: 'The primary PostgreSQL cluster master is reachable on internal subnet 10.240.12.4 on port 9443 without mTLS.'
+      },
+      {
+        btn: DOM.presetVecHr,
+        title: 'Executive Restructuring Plan Q4',
+        category: 'HR',
+        action: 'BLOCK',
+        threshold: 0.65,
+        text: 'Phase 2 workforce reduction plan eliminating 14% of mid-level engineering positions across EMEA and LATAM teams.'
+      }
+    ];
+
+    presets.forEach(p => {
+      if (!p.btn) return;
+      p.btn.addEventListener('click', () => {
+        if (DOM.vectorInputTitle) DOM.vectorInputTitle.value = p.title;
+        if (DOM.vectorInputCategory) DOM.vectorInputCategory.value = p.category;
+        if (DOM.vectorInputAction) DOM.vectorInputAction.value = p.action;
+        if (DOM.vectorInputThreshold) {
+          DOM.vectorInputThreshold.value = p.threshold;
+          if (DOM.vectorThresholdBadge) DOM.vectorThresholdBadge.textContent = p.threshold.toFixed(2);
+        }
+        if (DOM.vectorInputText) {
+          DOM.vectorInputText.value = p.text;
+          if (DOM.vectorTextCharCount) DOM.vectorTextCharCount.textContent = `${p.text.length} chars`;
+        }
+        showToast(`Loaded preset "${p.title}"!`, 'info');
+      });
+    });
+  }
+
+  async function testVectorSimilarity() {
+    if (!DOM.vectorLiveTestInput) return;
+    const text = DOM.vectorLiveTestInput.value.trim();
+    if (!text) {
+      showToast('Enter a test prompt first', 'info');
+      return;
+    }
+
+    if (DOM.btnTestVectorSim) DOM.btnTestVectorSim.classList.add('is-loading');
+
+    try {
+      const res = await fetch('/api/knowledge-vault/test-similarity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, top_k: 5, min_threshold: 0.0 })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        renderVectorSimilarityResult(data);
+      } else {
+        showToast('Similarity query failed', 'bad');
+      }
+    } catch (err) {
+      showToast('Error testing vector similarity', 'bad');
+    } finally {
+      if (DOM.btnTestVectorSim) DOM.btnTestVectorSim.classList.remove('is-loading');
+    }
+  }
+
+  function renderVectorSimilarityResult(data) {
+    if (!DOM.vectorLiveTestOutput) return;
+    DOM.vectorLiveTestOutput.style.display = 'block';
+
+    if (DOM.vectorTestLatencyText) {
+      DOM.vectorTestLatencyText.textContent = `${data.search_latency_ms.toFixed(1)}ms CPU search`;
+    }
+
+    const matches = data.matches || [];
+    const topMatch = matches.length > 0 ? matches[0] : null;
+
+    if (!topMatch || topMatch.similarity < 0.20) {
+      if (DOM.vectorTestVerdictPill) {
+        DOM.vectorTestVerdictPill.className = 'pill ok';
+        DOM.vectorTestVerdictPill.textContent = 'CLEAN PASS (No Confidential Match)';
+      }
+      if (DOM.vectorTestGaugeBar) {
+        DOM.vectorTestGaugeBar.style.width = '10%';
+        DOM.vectorTestGaugeBar.className = 'vector-similarity-bar';
+      }
+      if (DOM.vectorTestDetails) {
+        DOM.vectorTestDetails.innerHTML = `<span>Prompt evaluated cleanly with no semantic proximity to registered confidential knowledge.</span>`;
+      }
+      return;
+    }
+
+    const percent = Math.min(100, Math.round(topMatch.similarity * 100));
+    const isBreach = topMatch.is_breach;
+
+    if (DOM.vectorTestGaugeBar) {
+      DOM.vectorTestGaugeBar.style.width = `${percent}%`;
+      if (isBreach) {
+        DOM.vectorTestGaugeBar.className = topMatch.action === 'BLOCK' ? 'vector-similarity-bar breach' : 'vector-similarity-bar warn';
+      } else {
+        DOM.vectorTestGaugeBar.className = 'vector-similarity-bar';
+      }
+    }
+
+    if (DOM.vectorTestVerdictPill) {
+      if (isBreach) {
+        if (topMatch.action === 'BLOCK') {
+          DOM.vectorTestVerdictPill.className = 'pill bad';
+          DOM.vectorTestVerdictPill.textContent = `OUTBOUND BLOCKED (${percent}% Cosine Match)`;
+        } else {
+          DOM.vectorTestVerdictPill.className = 'pill warn';
+          DOM.vectorTestVerdictPill.textContent = `REDACTED [CONFIDENTIAL_CONTEXT] (${percent}% Match)`;
+        }
+      } else {
+        DOM.vectorTestVerdictPill.className = 'pill info';
+        DOM.vectorTestVerdictPill.textContent = `SUB-THRESHOLD MATCH (${percent}% < Threshold)`;
+      }
+    }
+
+    if (DOM.vectorTestDetails) {
+      DOM.vectorTestDetails.innerHTML = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>Matched Knowledge: <b style="color: var(--text);">${escapeHtml(topMatch.title)}</b> (${escapeHtml(topMatch.category)})</span>
+          <span style="font-family: var(--mono); color: var(--emerald);">${topMatch.similarity.toFixed(4)} similarity</span>
+        </div>
+        <div style="font-style: italic; color: var(--text-3); font-size: 11.5px;">"${escapeHtml(topMatch.text_snippet)}"</div>
+      `;
     }
   }
 

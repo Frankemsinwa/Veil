@@ -70,6 +70,11 @@ class PolicyEngine:
                     action = ActionType.REDACT
                 else:
                     action = ActionType.ALLOW
+            elif span.category == EntityCategory.PROPRIETARY:
+                if self.policy in (PolicyLevel.STRICT, PolicyLevel.BALANCED):
+                    action = ActionType.REDACT
+                else:
+                    action = ActionType.ALLOW
             else:
                 action = ActionType.ALLOW
 

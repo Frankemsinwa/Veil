@@ -14,6 +14,9 @@ class EntityCategory(str, Enum):
     # Infrastructure & Networking (Target: REDACT / ALLOW depending on policy)
     INFRASTRUCTURE = "INFRASTRUCTURE"
 
+    # Contextual Proprietary Knowledge & Vector Guardrails
+    PROPRIETARY = "PROPRIETARY"
+
 
 class EntityType(str, Enum):
     # Secrets
@@ -37,6 +40,9 @@ class EntityType(str, Enum):
 
     # Custom Enterprise Dictionary
     CUSTOM_ENTITY = "CUSTOM_ENTITY"
+
+    # Vector Semantic Guardrail
+    VECTOR_GUARDRAIL = "VECTOR_GUARDRAIL"
 
 
 class DetectedSpan(BaseModel):

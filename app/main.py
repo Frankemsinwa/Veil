@@ -393,7 +393,7 @@ async def toggle_knowledge_vault_entry(entry_id: str):
     updated = knowledge_vault.toggle_entry(entry_id)
     if not updated:
         return JSONResponse(status_code=404, content={"error": "Entry not found"})
-    return {"success": True, "enabled": updated.enabled}
+    return {"success": True, "entry": updated.model_dump(), "enabled": updated.enabled}
 
 
 @app.post("/api/knowledge-vault/test-similarity")
@@ -402,11 +402,11 @@ async def test_knowledge_similarity(request: Request):
     from app.engine.knowledge_vault import knowledge_vault
     from app.engine.vector_encoder import vector_encoder
     body = await request.json()
-    query = body.get("query", "")
+    query = body.get("query") or body.get("text") or ""
     top_k = int(body.get("top_k", 5))
 
     if not query.strip():
-        return {"matches": [], "query": query}
+        return {"matches": [], "query": query, "latency_ms": 0.0, "search_latency_ms": 0.0}
 
     t0 = time.perf_counter()
     query_vec = vector_encoder.encode_text(query)
@@ -416,6 +416,7 @@ async def test_knowledge_similarity(request: Request):
     return {
         "query": query,
         "latency_ms": round(latency_ms, 2),
+        "search_latency_ms": round(latency_ms, 2),
         "matches": [m.model_dump() for m in matches]
     }
 
@@ -514,6 +515,32 @@ async def test_sanitize(request: Request):
             "sanitized_text": None,
             "redaction_count": 0,
             "violations": sde.violations
+        }
+    except SemanticViolationException as sve:
+        privacy_event_bus.publish_sync("blocked", {
+            "session_id": session_id,
+            "model": "sandbox",
+            "reason": f"Semantic vector breach: {sve.violations[0].get('category') if sve.violations else 'Confidential'}",
+            "violations": [v.get("category", "PROPRIETARY") for v in sve.violations]
+        })
+        if settings.AUDIT_ENABLED:
+            audit_ledger.record_receipt(
+                session_id=session_id,
+                provider="sandbox",
+                model="sandbox",
+                policy=settings.POLICY.value,
+                action_taken="BLOCKED_SECRET",
+                redaction_count=0,
+                secret_blocked_count=len(sve.violations),
+                entities_detected=[v.get("category", "PROPRIETARY") for v in sve.violations],
+                latency_ms=1.0
+            )
+        return {
+            "blocked": True,
+            "original_text": text,
+            "sanitized_text": None,
+            "redaction_count": 0,
+            "violations": sve.violations
         }
     finally:
         vault_manager.remove_session(session_id)

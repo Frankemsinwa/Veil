@@ -88,6 +88,19 @@
           <span class="kbd">5</span>
         </a>
 
+        <a href="#vector-vault" class="nav-item" data-view="vector-vault" id="nav-vector-vault">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </span>
+          <span class="label">Semantic Vault</span>
+          <span class="nav-count" id="nav-vectors-count">0</span>
+          <span class="kbd">6</span>
+        </a>
+
         <a href="#settings" class="nav-item" data-view="settings" id="nav-settings">
           <span class="icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -96,7 +109,7 @@
             </svg>
           </span>
           <span class="label">System Settings</span>
-          <span class="kbd">6</span>
+          <span class="kbd">7</span>
         </a>
       </nav>
 
@@ -144,6 +157,12 @@
           <div class="pill ok" id="gateway-status-pill">
             <span class="dot ok live" id="status-pulse-dot"></span>
             <span id="status-label">GATEWAY ACTIVE</span>
+          </div>
+
+          <!-- Local Vector Health Badge -->
+          <div class="pill ok" id="vector-health-pill" title="Local INT8 Quantized Vector Guardrails (all-MiniLM-L6-v2) • Latency <15ms">
+            <span class="dot ok live" id="vector-health-dot"></span>
+            <span id="vector-health-label">VECTOR ONNX ACTIVE</span>
           </div>
 
           <!-- Policy Selector (Segmented) -->
@@ -748,7 +767,262 @@
           </div>
         </section>
 
-        <!-- VIEW 6: SETTINGS -->
+        <!-- VIEW 6: SEMANTIC GUARDRAILS & KNOWLEDGE VAULT -->
+        <section id="view-vector-vault" class="view">
+          <!-- Vector Health Status Card -->
+          <div class="card status-panel" id="vector-hero-card" style="margin-bottom: 16px;">
+            <div class="status-main">
+              <div class="status-eyebrow">
+                <span class="dot ok live"></span>
+                <span>ON-DEVICE DENSE EMBEDDING DEFENSE</span>
+              </div>
+              <h2 class="status-title">Enterprise Knowledge Vector Vault</h2>
+              <p class="status-desc">
+                Defends proprietary memos, financial forecasts, and internal secrets against semantic paraphrasing. 100% on-device INT8 neural embeddings guarantee zero cloud egress and microsecond inference latency.
+              </p>
+              <div class="status-meta">
+                <span>Active Knowledge Vectors: <b id="stat-vault-count">0 items</b></span>
+                <span>Model Architecture: <b>all-MiniLM-L6-v2 (INT8 ONNX)</b></span>
+                <span>Vector Dimension: <b>384-Dim Normalized L2</b></span>
+                <span>Mean Inference: <b>&lt;15ms CPU SIMD</b></span>
+                <span>Interceptions: <b id="stat-vault-hits">0 Breaches Blocked</b></span>
+              </div>
+            </div>
+
+            <div class="status-controls">
+              <div class="control">
+                <div class="control-row">
+                  <span class="control-label">LOCAL ONNX ENGINE</span>
+                  <span class="pill ok"><span class="dot ok live"></span><span>ONLINE</span></span>
+                </div>
+                <div class="control-row" style="margin-top: 10px;">
+                  <span class="control-label">FAIL-CLOSED ENFORCEMENT</span>
+                  <span class="pill ok"><span>ACTIVE</span></span>
+                </div>
+                <div class="control-row" style="margin-top: 10px;">
+                  <span class="control-label">VECTOR EMBEDDING FILE</span>
+                  <span style="font-family: var(--mono); font-size: 11px; color: var(--text-3);">knowledge_vectors.bin</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ingestion Card -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div class="card-title">Ingest Confidential Knowledge</div>
+                <div class="card-sub">Register sensitive documents, financial disclosures, or proprietary terms into the vector vault</div>
+              </div>
+              <div class="segmented sm" id="vector-mode-segmented">
+                <button type="button" class="active" data-mode="single" id="btn-mode-single" aria-pressed="true">Single Secret / Snippet</button>
+                <button type="button" data-mode="document" id="btn-mode-document" aria-pressed="false">Executive Memo / Document</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <!-- Quick Presets Bar -->
+              <div class="preset-bar">
+                <span class="preset-label">Quick Presets:</span>
+                <button type="button" class="preset-chip" id="preset-vec-ma" title="Fill M&A Target Buyout preset">
+                  <span>💼 M&A Target Buyout</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-vec-financial" title="Fill Unreleased Q3 Margin Forecast preset">
+                  <span>📉 Margin Forecast</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-vec-infra" title="Fill Internal DB Architecture preset">
+                  <span>🔒 Internal DB Cluster</span>
+                </button>
+                <button type="button" class="preset-chip" id="preset-vec-hr" title="Fill Restructuring Memo preset">
+                  <span>👥 HR Restructuring Plan</span>
+                </button>
+              </div>
+
+              <form id="form-add-vector">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                  <!-- Title -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="vector-input-title">Knowledge Item Title</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">A descriptive title for this confidential knowledge entry (e.g. <strong>Project Apex Acquisition Terms</strong>).</div>
+                      </div>
+                    </div>
+                    <input type="text" class="input" id="vector-input-title" placeholder="e.g. Project Apex Acquisition Terms" style="width: 100%;" required>
+                  </div>
+
+                  <!-- Category -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="vector-input-category">Classification Category</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">Select the security classification category. Used for audit logging and policy gating.</div>
+                      </div>
+                    </div>
+                    <select class="input" id="vector-input-category" style="width: 100%; cursor: pointer;">
+                      <option value="PROPRIETARY" selected>PROPRIETARY (Trade Secrets & IP)</option>
+                      <option value="FINANCIAL">FINANCIAL (Unreleased Earnings/Forecasts)</option>
+                      <option value="LEGAL">LEGAL (Privileged & M&A Clauses)</option>
+                      <option value="INFRASTRUCTURE">INFRASTRUCTURE (Internal IPs & Keys)</option>
+                      <option value="HR">HR (Personnel & Compensation)</option>
+                    </select>
+                  </div>
+
+                  <!-- Action -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="vector-input-action">Enforcement Action</label>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup"><strong>• BLOCK:</strong> Immediately halts prompt before egress.<br><strong>• REDACT:</strong> Replaces confidential sentence with <strong>[CONFIDENTIAL_CONTEXT_001]</strong> and restores it in AI reply.</div>
+                      </div>
+                    </div>
+                    <select class="input" id="vector-input-action" style="width: 100%; cursor: pointer;">
+                      <option value="BLOCK" selected>BLOCK (Fail-Closed Outbound Intercept)</option>
+                      <option value="REDACT">REDACT (Tokenize as [CONFIDENTIAL_CONTEXT])</option>
+                    </select>
+                  </div>
+
+                  <!-- Threshold Slider -->
+                  <div>
+                    <div class="field-head-row">
+                      <label class="field-head-label" for="vector-input-threshold">Similarity Threshold</label>
+                      <span class="threshold-val-badge" id="vector-threshold-badge">0.75</span>
+                      <div class="ui-tooltip-wrap">
+                        <span class="ui-tooltip-icon" tabindex="0">?</span>
+                        <div class="ui-tooltip-popup">Cosine threshold (0.50 - 0.95). Lower values (0.55-0.70) detect subtle paraphrasing; higher values (0.80+) require close wording.</div>
+                      </div>
+                    </div>
+                    <div class="threshold-slider-wrap">
+                      <input type="range" id="vector-input-threshold" min="0.50" max="0.95" step="0.01" value="0.75" style="width: 100%;">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Document Chunking Options (Only shown in document mode) -->
+                <div id="vector-doc-options" style="display: none; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--line); border-radius: var(--r-sm); margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <label for="vector-doc-window" style="font-size: 12px; color: var(--text-2);">Window Size (Sentences):</label>
+                      <input type="number" id="vector-doc-window" value="2" min="1" max="5" class="input" style="width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <label for="vector-doc-stride" style="font-size: 12px; color: var(--text-2);">Stride Step:</label>
+                      <input type="number" id="vector-doc-stride" value="1" min="1" max="3" class="input" style="width: 60px;">
+                    </div>
+                    <span class="muted" style="font-size: 11px;">Overlapping 2-sentence windows guarantee robust detection across sentence boundaries.</span>
+                  </div>
+                </div>
+
+                <!-- Text Area -->
+                <div style="margin-bottom: 14px;">
+                  <div class="field-head-row">
+                    <label class="field-head-label" for="vector-input-text">Confidential Text / Document Payload</label>
+                    <span class="muted" id="vector-text-char-count" style="font-size: 11px;">0 chars</span>
+                  </div>
+                  <textarea class="input" id="vector-input-text" rows="3" placeholder="Enter sensitive phrases, internal project specifications, or paste an executive memo..." style="width: 100%; resize: vertical; min-height: 80px;" required></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <div style="display: flex; justify-content: flex-end;">
+                  <button type="submit" class="btn btn-primary" id="btn-save-vector" style="padding: 0 20px;">
+                    <span class="icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </span>
+                    <span id="btn-save-vector-text">Ingest Into Vector Vault</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Live Semantic Similarity Sandbox Tester -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Live Semantic Similarity Sandbox</div>
+                <div class="card-sub">Test prompts or clever paraphrases against your active knowledge vault with real-time cosine scoring</div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                <input type="text" class="input" id="vector-live-test-input" placeholder="Type a paraphrased prompt to test (e.g. We expect margins to compress by 400 bps in Q3)..." style="flex: 1; min-width: 260px;">
+                <button type="button" class="btn btn-primary" id="btn-test-vector-sim">
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                  </span>
+                  <span>Test Similarity (&lt;15ms)</span>
+                </button>
+              </div>
+
+              <!-- Test Result Card -->
+              <div id="vector-live-test-output" style="display: none; padding: 14px; background: var(--bg-surface); border: 1px solid var(--line-strong); border-radius: var(--r-sm);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span id="vector-test-verdict-pill" class="pill ok">CLEAN PASS</span>
+                  <span style="font-family: var(--mono); font-size: 11px; color: var(--text-3);" id="vector-test-latency-text">0.0ms</span>
+                </div>
+                <div class="vector-similarity-gauge">
+                  <div class="vector-similarity-bar" id="vector-test-gauge-bar" style="width: 0%;"></div>
+                </div>
+                <div id="vector-test-details" style="font-size: 12px; color: var(--text-2); margin-top: 8px;">
+                  <!-- Filled dynamically -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Knowledge Items Table -->
+          <div class="card">
+            <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div class="card-title">Protected Knowledge Items</div>
+                <div class="card-sub">Active vectors loaded in memory and monitored during outbound prompt inspection</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <!-- Category Filter -->
+                <div class="segmented sm" id="vector-category-segmented">
+                  <button type="button" class="active" data-cat="ALL" aria-pressed="true">All</button>
+                  <button type="button" data-cat="PROPRIETARY" aria-pressed="false">Proprietary</button>
+                  <button type="button" data-cat="FINANCIAL" aria-pressed="false">Financial</button>
+                  <button type="button" data-cat="LEGAL" aria-pressed="false">Legal</button>
+                  <button type="button" data-cat="INFRASTRUCTURE" aria-pressed="false">Infra</button>
+                  <button type="button" data-cat="HR" aria-pressed="false">HR</button>
+                </div>
+
+                <!-- Search -->
+                <div class="search" style="width: 180px;">
+                  <span class="search-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </span>
+                  <input type="text" class="input" id="search-vector-rules" placeholder="Filter knowledge...">
+                </div>
+
+                <span class="pill info" id="vector-rules-count-pill">0 Entries</span>
+              </div>
+            </div>
+            <div id="vector-rules-list">
+              <div class="empty">
+                <span class="icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                </span>
+                <div class="empty-title">No Knowledge Vectors Registered</div>
+                <div class="empty-desc">Ingest sensitive documents, financial disclosures, or secrets above to guard against unauthorized leakage or AI training extraction.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 7: SETTINGS -->
         <section id="view-settings" class="view">
           <div class="section-head">
             <div>
