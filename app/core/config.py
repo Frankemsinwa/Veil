@@ -92,6 +92,24 @@ class Settings(BaseSettings):
         description="Path to quantized ONNX classification model file"
     )
 
+    # Local Vector & Embedding Guardrails (Phase 1)
+    VECTOR_GUARDRAILS_ENABLED: bool = Field(
+        default=True,
+        description="Enable local dense vector embedding guardrails"
+    )
+    VECTOR_MODEL_DIR: Path = Field(
+        default=Path("data/models/semantic"),
+        description="Directory containing model_quantized.onnx and tokenizer.json"
+    )
+    VECTOR_SIMILARITY_THRESHOLD_BLOCK: float = Field(
+        default=0.85,
+        description="Cosine similarity threshold to fail-closed block outbound prompt"
+    )
+    VECTOR_SIMILARITY_THRESHOLD_WARN: float = Field(
+        default=0.70,
+        description="Cosine similarity threshold to redact/warn outbound prompt"
+    )
+
     # Audit & Ledger
     AUDIT_ENABLED: bool = Field(default=True, description="Enable local SQLite audit logging")
     DATA_DIR: Path = Field(

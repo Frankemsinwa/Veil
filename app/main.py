@@ -295,6 +295,131 @@ async def toggle_custom_entity(rule_id: str):
     return {"success": True, "enabled": updated.enabled}
 
 
+# ------------------ Local Vector & Knowledge Vault API (Phase 2) ------------------
+
+@app.get("/api/knowledge-vault")
+async def get_knowledge_vault():
+    """Returns all confidential vector entries and vector repository metrics."""
+    from app.engine.knowledge_vault import knowledge_vault
+    entries = knowledge_vault.get_all_entries()
+    stats = knowledge_vault.get_vault_stats()
+    return {
+        "entries": [e.model_dump() for e in entries],
+        "stats": stats
+    }
+
+
+@app.post("/api/knowledge-vault/entry")
+async def add_knowledge_vault_entry(request: Request):
+    """Adds a single protected knowledge vector entry to the repository."""
+    from app.engine.knowledge_vault import knowledge_vault
+    body = await request.json()
+    title = body.get("title", "")
+    text = body.get("text", "")
+    category = body.get("category", "PROPRIETARY")
+    action = body.get("action", "BLOCK")
+    threshold_override = body.get("threshold_override")
+    enabled = bool(body.get("enabled", True))
+
+    if not text.strip():
+        return JSONResponse(status_code=400, content={"error": "Text cannot be empty"})
+
+    entry = knowledge_vault.add_entry(
+        title=title,
+        text=text,
+        category=category,
+        action=action,
+        threshold_override=threshold_override,
+        enabled=enabled
+    )
+    privacy_event_bus.publish_sync("metric", {
+        "action": "knowledge_vector_added",
+        "title": entry.title
+    })
+    return {"success": True, "entry": entry.model_dump()}
+
+
+@app.post("/api/knowledge-vault/embed-document")
+async def embed_document_to_vault(request: Request):
+    """Splits a full document into overlapping sentence windows, embeds, and stores in the vault."""
+    from app.engine.knowledge_vault import knowledge_vault
+    body = await request.json()
+    title = body.get("title", "")
+    text = body.get("text", "")
+    category = body.get("category", "PROPRIETARY")
+    action = body.get("action", "BLOCK")
+    threshold_override = body.get("threshold_override")
+    window_size = int(body.get("window_size", 2))
+    stride = int(body.get("stride", 1))
+
+    if not text.strip():
+        return JSONResponse(status_code=400, content={"error": "Document text cannot be empty"})
+
+    entries = knowledge_vault.embed_document(
+        title=title,
+        document_text=text,
+        category=category,
+        action=action,
+        threshold_override=threshold_override,
+        window_size_sentences=window_size,
+        stride=stride
+    )
+    privacy_event_bus.publish_sync("metric", {
+        "action": "document_embedded",
+        "title": title,
+        "chunk_count": len(entries)
+    })
+    return {
+        "success": True,
+        "chunk_count": len(entries),
+        "entries": [e.model_dump() for e in entries]
+    }
+
+
+@app.delete("/api/knowledge-vault/{entry_id}")
+async def delete_knowledge_vault_entry(entry_id: str):
+    """Deletes an entry from the knowledge vector repository."""
+    from app.engine.knowledge_vault import knowledge_vault
+    success = knowledge_vault.delete_entry(entry_id)
+    if not success:
+        return JSONResponse(status_code=404, content={"error": "Entry not found"})
+    return {"success": True}
+
+
+@app.post("/api/knowledge-vault/{entry_id}/toggle")
+async def toggle_knowledge_vault_entry(entry_id: str):
+    """Toggles active/inactive state of a knowledge vector entry."""
+    from app.engine.knowledge_vault import knowledge_vault
+    updated = knowledge_vault.toggle_entry(entry_id)
+    if not updated:
+        return JSONResponse(status_code=404, content={"error": "Entry not found"})
+    return {"success": True, "enabled": updated.enabled}
+
+
+@app.post("/api/knowledge-vault/test-similarity")
+async def test_knowledge_similarity(request: Request):
+    """Tests query similarity against the knowledge vector repository in real-time."""
+    from app.engine.knowledge_vault import knowledge_vault
+    from app.engine.vector_encoder import vector_encoder
+    body = await request.json()
+    query = body.get("query", "")
+    top_k = int(body.get("top_k", 5))
+
+    if not query.strip():
+        return {"matches": [], "query": query}
+
+    t0 = time.perf_counter()
+    query_vec = vector_encoder.encode_text(query)
+    matches = knowledge_vault.search(query_vec, top_k=top_k, min_threshold=0.30)
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+
+    return {
+        "query": query,
+        "latency_ms": round(latency_ms, 2),
+        "matches": [m.model_dump() for m in matches]
+    }
+
+
 # ------------------ Phase 14: Enterprise Cockpit UI & Sandbox ------------------
 
 if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
