@@ -11,6 +11,10 @@ datas = [
     (str(root_dir / 'packager' / 'veil.ico'), 'packager'),
 ]
 
+models_dir = root_dir / 'data' / 'models' / 'semantic'
+if models_dir.exists():
+    datas.append((str(models_dir), 'data/models/semantic'))
+
 hidden_imports = [
     # Full Veil application tree
     'app',
@@ -32,6 +36,8 @@ hidden_imports = [
     'app.clients.claude_code',
     'app.clients.aider',
     'app.clients.system_env',
+    'app.clients.antigravity',
+    'app.clients.opencode',
     'app.engine',
     'app.engine.pipeline',
     'app.engine.regex_scanner',
@@ -41,6 +47,11 @@ hidden_imports = [
     'app.engine.ast_filter',
     'app.engine.policy_engine',
     'app.engine.redactor',
+    'app.engine.vector_encoder',
+    'app.engine.knowledge_vault',
+    'app.engine.vector_window',
+    'app.engine.vector_models',
+    'app.engine.custom_dictionary',
     'app.vault',
     'app.vault.crypto',
     'app.vault.session_vault',
@@ -57,6 +68,11 @@ hidden_imports = [
     'app.providers.openai_adapter',
     'app.providers.anthropic_adapter',
     'app.providers.ollama_adapter',
+
+    # Neural & Vector ML Dependencies
+    'onnxruntime',
+    'tokenizers',
+    'numpy',
 
     # Uvicorn ASGI & WebSockets
     'uvicorn',
@@ -112,7 +128,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'scipy', 'numpy'],
+    excludes=['tkinter', 'matplotlib', 'scipy'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
