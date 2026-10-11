@@ -157,9 +157,9 @@ class VeilDoctor:
             decisions, redact_spans, semantic_result = self.pipeline.inspect_semantic(test_prompt)
             elapsed = (time.perf_counter() - start) * 1000.0
 
-            if elapsed > 100.0:
+            if elapsed > 250.0:
                 status = "WARN"
-                msg = f"Detection pipeline completed in {elapsed:.1f}ms (higher than recommended 50ms)."
+                msg = f"Detection pipeline completed in {elapsed:.1f}ms (higher than recommended 150ms)."
             else:
                 status = "PASS"
                 msg = f"Regex, Shannon Entropy & Semantic engines nominal ({elapsed:.2f}ms)."

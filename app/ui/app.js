@@ -181,7 +181,24 @@
     vectorRulesList: document.getElementById('vector-rules-list')
   };
 
-  // SVGs for AI Clients
+  // Official Brand Logos for AI Clients & Upstream Providers
+  const CLIENT_LOGOS = {
+    antigravity: '/static/assets/logos/antigravity.png',
+    cursor: '/static/assets/logos/cursor.png',
+    continue: '/static/assets/logos/continue.png',
+    claude_code: '/static/assets/logos/claude_code.png',
+    aider: '/static/assets/logos/aider.png',
+    system_env: '/static/assets/logos/system_env.png',
+    opencode: '/static/assets/logos/opencode.png'
+  };
+
+  const PROVIDER_LOGOS = {
+    openai: '/static/assets/logos/openai.png',
+    anthropic: '/static/assets/logos/anthropic.png',
+    ollama: '/static/assets/logos/ollama.png'
+  };
+
+  // SVGs for AI Clients (Fallback)
   const CLIENT_ICONS = {
     antigravity: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 22h20L12 2z"></path><circle cx="12" cy="14" r="3"></circle></svg>`,
     cursor: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l7 17 2.5-6.5L20 12 4 4z"></path></svg>`,
@@ -235,6 +252,7 @@
     renderChart();
     connectWebSocket();
     fetchClients();
+    renderProviders();
     fetchMetrics();
     fetchAutostart();
     fetchVectorEntries();
@@ -755,13 +773,16 @@
       actionBtn = `<button class="btn btn-sm" disabled>Not Found</button>`;
     }
 
-    const iconSvg = CLIENT_ICONS[client.id] || CLIENT_ICONS.default;
+    const logoSrc = CLIENT_LOGOS[client.id];
+    const logoMarkup = logoSrc
+      ? `<img src="${logoSrc}" alt="${escapeHtml(client.name)}" class="client-brand-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><span class="icon" style="display: none;">${CLIENT_ICONS[client.id] || CLIENT_ICONS.default}</span>`
+      : (CLIENT_ICONS[client.id] || CLIENT_ICONS.default);
     const pathText = client.config_path || 'Managed via System Environment';
 
     return `
       <div class="client-row ${isMissing ? 'is-missing' : ''}" data-id="${escapeHtml(client.id)}">
         <div class="client-logo">
-          ${iconSvg}
+          ${logoMarkup}
         </div>
         <div>
           <div class="client-name">
@@ -855,10 +876,15 @@
         ? `<span class="pill ok"><span class="dot ok live"></span>Connected</span>`
         : (isDetected ? `<span class="pill warn">Detected</span>` : `<span class="pill">Inactive</span>`);
 
+      const logoSrc = CLIENT_LOGOS[c.id];
+      const iconMarkup = logoSrc
+        ? `<img src="${logoSrc}" alt="${escapeHtml(c.name)}" class="client-mini-img">`
+        : (CLIENT_ICONS[c.id] || CLIENT_ICONS.default);
+
       html += `
         <li>
-          <span class="ev-icon ${isConnected ? 'redaction' : ''}">
-            ${CLIENT_ICONS[c.id] || CLIENT_ICONS.default}
+          <span class="ev-icon client-brand ${isConnected ? 'ok' : ''}">
+            ${iconMarkup}
           </span>
           <span class="name">${escapeHtml(c.name)}</span>
           ${statusPill}
@@ -866,6 +892,73 @@
       `;
     });
     DOM.dashboardMiniClients.innerHTML = html;
+  }
+
+  function renderProviders() {
+    const container = document.getElementById('providers-container');
+    if (!container) return;
+
+    const providers = [
+      {
+        id: 'openai',
+        name: 'OpenAI (GPT-4o, o1, Text Embeddings)',
+        description: 'Target: https://api.openai.com/v1 • Primary upstream foundation model API',
+        url: 'https://api.openai.com/v1',
+        status: 'ACTIVE'
+      },
+      {
+        id: 'anthropic',
+        name: 'Anthropic (Claude 3.5 Sonnet / Opus)',
+        description: 'Target: https://api.anthropic.com/v1 • High-reasoning enterprise agent API',
+        url: 'https://api.anthropic.com/v1',
+        status: 'ACTIVE'
+      },
+      {
+        id: 'ollama',
+        name: 'Ollama (Local Models: Llama 3, Qwen, DeepSeek)',
+        description: 'Target: http://127.0.0.1:11434 • Zero-egress local offline runtime',
+        url: 'http://127.0.0.1:11434',
+        status: 'LOCAL'
+      }
+    ];
+
+    container.innerHTML = providers.map(p => {
+      const isLocal = p.status === 'LOCAL';
+      const badge = `<span class="pill ${isLocal ? 'info' : 'ok'}"><span class="dot ${isLocal ? 'info' : 'ok live'}"></span>${p.status}</span>`;
+      return `
+        <div class="client-row" data-id="${p.id}">
+          <div class="client-logo">
+            <img src="${PROVIDER_LOGOS[p.id]}" alt="${p.name}" class="client-brand-img">
+          </div>
+          <div>
+            <div class="client-name">
+              <span>${escapeHtml(p.name)}</span>
+              ${badge}
+            </div>
+            <div class="client-desc">${escapeHtml(p.description)}</div>
+            <div class="client-path btn-copy-path" data-path="${escapeHtml(p.url)}" title="Click to copy endpoint URL">
+              <span>${escapeHtml(p.url)}</span>
+              <span class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </span>
+            </div>
+          </div>
+          <div class="client-actions">
+            <span class="pill muted" style="font-size: 11px;">AUTO-ROUTED</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('.btn-copy-path').forEach(el => {
+      el.addEventListener('click', () => {
+        const path = el.dataset.path;
+        if (path) copyToClipboard(path, 'Endpoint URL copied!');
+      });
+    });
   }
 
   /**
@@ -1801,10 +1894,7 @@
             </div>
           </div>
           <div class="vector-rule-actions">
-            <label class="switch sm" title="Toggle active status">
-              <input type="checkbox" class="vector-toggle-switch" data-id="${escapeHtml(entry.id)}" ${entry.enabled ? 'checked' : ''}>
-              <span class="slider"></span>
-            </label>
+            <button type="button" class="switch vector-toggle-switch" role="switch" aria-checked="${entry.enabled ? 'true' : 'false'}" data-id="${escapeHtml(entry.id)}" title="${entry.enabled ? 'Deactivate rule' : 'Activate rule'}" aria-label="Toggle ${escapeHtml(entry.title)}"></button>
             <button class="btn btn-ghost btn-sm btn-icon btn-test-vector-item" data-id="${escapeHtml(entry.id)}" title="Simulate Prompt Against This Vector">
               <span class="icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1829,7 +1919,9 @@
 
     // Attach row event listeners
     DOM.vectorRulesList.querySelectorAll('.vector-toggle-switch').forEach(sw => {
-      sw.addEventListener('change', () => {
+      sw.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const id = sw.dataset.id;
         toggleVectorEntry(id);
       });
@@ -1855,18 +1947,31 @@
   }
 
   async function toggleVectorEntry(id) {
+    const entry = state.vectorEntries.find(e => e.id === id);
+    if (!entry) return;
+
     try {
       const res = await fetch(`/api/knowledge-vault/${id}/toggle`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         const idx = state.vectorEntries.findIndex(e => e.id === id);
         if (idx !== -1) {
-          state.vectorEntries[idx] = data.entry;
+          if (data.entry) {
+            state.vectorEntries[idx] = data.entry;
+          } else if (typeof data.enabled === 'boolean') {
+            state.vectorEntries[idx].enabled = data.enabled;
+          } else {
+            state.vectorEntries[idx].enabled = !entry.enabled;
+          }
         }
         updateVectorVaultUI();
-        showToast(`Rule ${data.entry.enabled ? 'activated' : 'deactivated'}`, 'info');
+        const isEnabled = data.entry ? data.entry.enabled : (data.enabled ?? !entry.enabled);
+        showToast(`Rule ${isEnabled ? 'activated' : 'deactivated'}`, 'ok');
+      } else {
+        showToast('Failed to toggle vector rule', 'bad');
       }
     } catch (err) {
+      console.error('Toggle vector entry error:', err);
       showToast('Failed to toggle vector rule', 'bad');
     }
   }

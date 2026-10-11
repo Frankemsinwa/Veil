@@ -26,6 +26,26 @@ def create_shield_icon(color_hex: str = "#00f5a0", size: int = 64) -> Image.Imag
       - Paused: #ffb703 (Amber)
       - Alert:  #ff3366 (Crimson)
     """
+    from pathlib import Path
+    logo_path = Path(__file__).resolve().parent.parent / "ui" / "assets" / "veil_logo.png"
+    if logo_path.exists():
+        try:
+            base = Image.open(logo_path).convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
+            draw = ImageDraw.Draw(base)
+            h = color_hex.lstrip("#")
+            rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+            dot_r = max(2, int(size * 0.15))
+            dot_center = (int(size * 0.82), int(size * 0.82))
+            draw.ellipse(
+                [dot_center[0] - dot_r, dot_center[1] - dot_r, dot_center[0] + dot_r, dot_center[1] + dot_r],
+                fill=(*rgb, 255),
+                outline=(0, 0, 0, 255),
+                width=1
+            )
+            return base
+        except Exception:
+            pass
+
     scale = 4
     canvas_size = size * scale
     image = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))

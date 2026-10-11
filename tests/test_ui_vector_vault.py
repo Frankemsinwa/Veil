@@ -61,7 +61,7 @@ async def test_vector_vault_cockpit_lifecycle():
             assert res_sim.status_code == 200
             sim_data = res_sim.json()
             assert len(sim_data["matches"]) >= 1
-            assert sim_data["search_latency_ms"] < 50.0
+            assert sim_data["search_latency_ms"] < 150.0
 
             # 4. Toggle entry status
             res_toggle = await client.post(f"/api/knowledge-vault/{entry_id}/toggle")

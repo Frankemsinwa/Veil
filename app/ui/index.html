@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Veil — Enterprise AI Privacy Gateway</title>
+  <link rel="icon" type="image/png" href="/static/assets/veil_logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,9 +16,7 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
+          <img src="/static/assets/veil_logo.png" alt="Veil Guardian Logo" class="brand-mascot-img">
         </div>
         <div class="brand-text">
           <div class="brand-name">VEIL</div>
@@ -376,6 +375,19 @@
               <div class="sk" style="height: 28px; width: 80px;"></div>
             </div>
           </div>
+
+          <!-- Upstream LLM Providers -->
+          <div style="margin-top: 26px;">
+            <div class="section-head" style="margin-bottom: 12px;">
+              <div>
+                <h2>Upstream LLM Providers</h2>
+                <p>Enterprise AI routing targets configured for transparent pass-through and tokenized egress.</p>
+              </div>
+            </div>
+            <div class="card client-list" id="providers-container">
+              <!-- Dynamic provider cards rendered by JS -->
+            </div>
+          </div>
         </section>
 
         <!-- VIEW 3: TELEMETRY FEED -->
@@ -730,7 +742,7 @@
                   <button type="button" data-filter="active" aria-pressed="false">Active Only</button>
                 </div>
                 <!-- Search -->
-                <div class="search" style="width: 180px;">
+                <div class="search" style="width: 180px; flex-shrink: 0;">
                   <span class="search-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                   </span>
@@ -984,7 +996,7 @@
                 <div class="card-title">Protected Knowledge Items</div>
                 <div class="card-sub">Active vectors loaded in memory and monitored during outbound prompt inspection</div>
               </div>
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <!-- Category Filter -->
                 <div class="segmented sm" id="vector-category-segmented">
                   <button type="button" class="active" data-cat="ALL" aria-pressed="true">All</button>
@@ -996,14 +1008,14 @@
                 </div>
 
                 <!-- Search -->
-                <div class="search" style="width: 180px;">
+                <div class="search" style="width: 190px; flex-shrink: 0;">
                   <span class="search-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                   </span>
                   <input type="text" class="input" id="search-vector-rules" placeholder="Filter knowledge...">
                 </div>
 
-                <span class="pill info" id="vector-rules-count-pill">0 Entries</span>
+                <span class="pill info" id="vector-rules-count-pill" style="flex-shrink: 0; white-space: nowrap;">0 Entries</span>
               </div>
             </div>
             <div id="vector-rules-list">
