@@ -316,6 +316,40 @@ python -m app.cli disconnect cursor
 python -m app.cli disconnect-all
 ```
 
+### `veil plans` / `veil license`
+View commercial plans, active cryptographic license tier, and entitlements.
+```powershell
+# List available tiers and rates
+python -m app.cli plans
+
+# View active license details and expiration
+python -m app.cli license
+```
+
+### `veil checkout` / `veil activate`
+Generate a Paystack checkout session or activate an offline license key.
+```powershell
+# Generate Paystack checkout link (supports Nigerian and international cards)
+python -m app.cli checkout --email user@company.com --tier pro --currency NGN
+
+# Activate signed license key offline
+python -m app.cli activate "VL-PRO-ey..."
+```
+
+---
+
+## Commercial Plans & Paystack Integration
+
+Veil provides a 3-tier commercial model integrated with **Paystack** for seamless local and global card payments:
+
+| Plan | Pricing (NGN) | Pricing (USD) | Max Clients | Key Capabilities |
+| :--- | :--- | :--- | :---: | :--- |
+| **Community / Solo** | **Free** | **Free** | 1 client | ReDoS-safe Regex, Shannon Entropy ($H \ge 4.2$), Local Web Cockpit, SSE Stream Restorer. |
+| **Pro / Team** | **₦30,000 / mo** | **$20.00 / mo** | Unlimited | **Local ONNX INT8 Quantized Defense**, Custom Corporate Dictionary, Knowledge Vault Indexing, Unlimited Simultaneous IDEs, Full Audit Export. |
+| **Enterprise Fleet** | **₦90,000 / seat / mo** | **$60.00 / seat / mo**| Unlimited | Pre-packaged Windows MSI for Intune/GPO, Centralized Fleet Sync (V2), SIEM Export, SOC 2 / NDPA Compliance Reports, Enterprise SLA. |
+
+> **Global Card Payments:** Powered by Paystack (a Stripe company). Accepts Nigerian Verve, Mastercard, and Visa, as well as international cards (USD, GBP, EUR) from clients worldwide.
+
 ---
 
 ## Enterprise Cockpit & Web UI

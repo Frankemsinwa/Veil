@@ -110,6 +110,18 @@
           <span class="label">System Settings</span>
           <span class="kbd">7</span>
         </a>
+
+        <a href="#billing" class="nav-item" data-view="billing" id="nav-billing">
+          <span class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+              <line x1="1" y1="10" x2="23" y2="10"></line>
+            </svg>
+          </span>
+          <span class="label">Plans & Billing</span>
+          <span class="nav-count" id="nav-plan-tier-badge" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8; font-weight: 700;">FREE</span>
+          <span class="kbd">8</span>
+        </a>
       </nav>
 
       <div class="sidebar-spacer"></div>
@@ -1085,6 +1097,118 @@
               </div>
               <span class="mono muted">v0.1.0</span>
             </div>
+          </div>
+        </section>
+
+        <!-- VIEW 6: PLANS & BILLING -->
+        <section id="view-billing" class="view">
+          <div class="view-header">
+            <div>
+              <h2>Commercial Plans & Licensing</h2>
+              <p>Choose the privacy protection tier that fits your engineering team or enterprise fleet.</p>
+            </div>
+            <!-- Currency Switcher Toggle -->
+            <div class="segmented sm" id="currency-segmented" role="radiogroup" aria-label="Currency">
+              <button type="button" class="active" data-currency="NGN" id="btn-currency-ngn">🇳🇬 NGN (₦)</button>
+              <button type="button" data-currency="USD" id="btn-currency-usd">🌍 USD ($)</button>
+            </div>
+          </div>
+
+          <!-- Active License Status Card -->
+          <div class="card" id="billing-active-license-card" style="margin-bottom: 24px; border-left: 4px solid #0ea5e9;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                  <span class="pill ok" id="billing-tier-badge" style="font-size: 13px; font-weight: 700;">SOLO / COMMUNITY</span>
+                  <span style="font-size: 13px; color: var(--text-2);" id="billing-status-sub">Active Free License</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-3);" id="billing-customer-display">
+                  Licensed to: <strong id="billing-customer-email" style="color: var(--text);">developer@community.veil</strong> • ID: <code id="billing-license-id">VL-FREE-COMMUNITY</code>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary btn-sm" id="btn-open-activate-box">Enter License Key</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3-Column Pricing Grid -->
+          <div class="pricing-grid">
+            <!-- Plan 1: Free -->
+            <div class="card pricing-card" id="card-plan-free">
+              <div class="plan-badge">Default Tier</div>
+              <h3 class="plan-title">Community / Solo</h3>
+              <p class="plan-desc">Essential local privacy proxy for individual engineers.</p>
+              <div class="plan-price">
+                <span class="price-amount">Free</span>
+                <span class="price-period">forever</span>
+              </div>
+              <ul class="plan-features">
+                <li><span class="check">✓</span> ReDoS-Safe Regex scanning (PII, API keys)</li>
+                <li><span class="check">✓</span> Shannon Entropy detection (H ≥ 4.2)</li>
+                <li><span class="check">✓</span> 1 connected IDE client at a time</li>
+                <li><span class="check">✓</span> SSE sliding-window stream restorer</li>
+                <li><span class="check">✓</span> Local Web Cockpit & System Tray</li>
+                <li class="disabled"><span class="cross">✕</span> Local ONNX Vector ML Guardrail</li>
+                <li class="disabled"><span class="cross">✕</span> Custom Corporate Dictionary</li>
+                <li class="disabled"><span class="cross">✕</span> Simultaneous multi-IDE routing</li>
+              </ul>
+              <button class="btn btn-secondary plan-btn" disabled id="btn-plan-free">Active Plan</button>
+            </div>
+
+            <!-- Plan 2: Pro -->
+            <div class="card pricing-card popular" id="card-plan-pro">
+              <div class="plan-badge highlight">Most Popular</div>
+              <h3 class="plan-title">Pro / Team</h3>
+              <p class="plan-desc">Advanced neural vector protection for professional developers & startups.</p>
+              <div class="plan-price">
+                <span class="price-amount" id="pro-price-display">₦30,000</span>
+                <span class="price-period" id="pro-period-display">/ month</span>
+              </div>
+              <ul class="plan-features">
+                <li><span class="check">✓</span> <strong>Everything in Community</strong></li>
+                <li><span class="check">✓</span> <strong>Local ONNX INT8 Quantized Defense</strong></li>
+                <li><span class="check">✓</span> <strong>Knowledge Vault vector embeddings</strong></li>
+                <li><span class="check">✓</span> <strong>Custom Corporate Dictionary</strong></li>
+                <li><span class="check">✓</span> <strong>Unlimited simultaneous IDE connections</strong></li>
+                <li><span class="check">✓</span> <strong>Full CSV/JSON compliance audit export</strong></li>
+                <li><span class="check">✓</span> <strong>Global Card Acceptance (Paystack)</strong></li>
+              </ul>
+              <button class="btn btn-primary plan-btn" id="btn-upgrade-pro">Upgrade with Paystack</button>
+            </div>
+
+            <!-- Plan 3: Enterprise -->
+            <div class="card pricing-card" id="card-plan-enterprise">
+              <div class="plan-badge">Enterprise</div>
+              <h3 class="plan-title">Enterprise Fleet</h3>
+              <p class="plan-desc">Centralized data loss prevention for fintechs, banks, and scale-ups.</p>
+              <div class="plan-price">
+                <span class="price-amount" id="ent-price-display">₦90,000</span>
+                <span class="price-period" id="ent-period-display">/ seat / month</span>
+              </div>
+              <ul class="plan-features">
+                <li><span class="check">✓</span> <strong>Everything in Pro</strong></li>
+                <li><span class="check">✓</span> <strong>Pre-packaged Windows MSI for Intune/GPO</strong></li>
+                <li><span class="check">✓</span> Centralized Fleet Sync (Coming in V2)</li>
+                <li><span class="check">✓</span> SIEM log export (Splunk, Datadog)</li>
+                <li><span class="check">✓</span> Dedicated compliance reports (SOC 2, NDPA)</li>
+                <li><span class="check">✓</span> Custom model fine-tuning & enterprise SLA</li>
+              </ul>
+              <button class="btn btn-secondary plan-btn" id="btn-contact-enterprise">Contact Enterprise Sales</button>
+            </div>
+          </div>
+
+          <!-- License Key Activation Box -->
+          <div class="card" id="box-activate-key" style="margin-top: 24px;">
+            <h3 style="font-size: 15px; font-weight: 700; margin-bottom: 6px;">Activate License Key</h3>
+            <p style="color: var(--text-2); font-size: 13px; margin-bottom: 16px;">
+              Have an offline license key or enterprise team license? Enter your key below to activate instantly without internet access.
+            </p>
+            <div style="display: flex; gap: 12px; max-width: 600px;">
+              <input type="text" class="input" id="input-license-key" placeholder="VL-PRO-ey..." style="flex: 1; font-family: var(--mono); font-size: 13px; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--line); border-radius: var(--r-md); color: var(--text);">
+              <button class="btn btn-primary" id="btn-submit-license-key">Activate Key</button>
+            </div>
+            <div id="license-key-feedback" style="margin-top: 10px; font-size: 13px; font-weight: 600;"></div>
           </div>
         </section>
 

@@ -54,12 +54,15 @@ async def lifespan(app: FastAPI):
     vault_manager.zeroize_all()
 
 
+from app.billing.routes import billing_router
+
 app = FastAPI(
     title="Veil AI Privacy Gateway",
     description="Local, fail-closed, enterprise privacy gateway for LLM traffic.",
     version="0.1.0",
     lifespan=lifespan
 )
+app.include_router(billing_router)
 
 
 @app.exception_handler(VeilSecurityException)

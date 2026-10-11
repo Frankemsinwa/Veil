@@ -372,5 +372,166 @@ def gui(
     launch_gui(host=host, port=port, debug=debug)
 
 
+@cli.command("plans")
+def list_plans():
+    """Display available commercial pricing tiers, rates (NGN/USD), and active status."""
+    from app.licensing.manager import license_manager
+
+    plans = license_manager.get_all_plans()
+    table = Table(title="Veil Commercial Pricing Plans & Feature Entitlements")
+    table.add_column("Tier", style="bold cyan", no_wrap=True)
+    table.add_column("Monthly Price", style="bold green", no_wrap=True)
+    table.add_column("Max Clients", style="magenta", justify="center")
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Key Capabilities", style="dim white")
+
+    for p in plans:
+        status_text = "[bold green]ACTIVE[/bold green]" if p.is_active else "[dim]Available[/dim]"
+        if p.price_usd_monthly == 0:
+            price_str = "Free"
+        else:
+            price_str = f"NGN {p.price_ngn_monthly:,} / ${p.price_usd_monthly:.0f}"
+
+        table.add_row(
+            p.name,
+            price_str,
+            str(p.max_clients) if p.max_clients < 900 else "Unlimited",
+            status_text,
+            "; ".join(p.features[:3]) + "..."
+        )
+    console.print(table)
+
+
+@cli.command("license")
+def show_license():
+    """View active cryptographic license details, customer email, and entitlements."""
+    from app.licensing.manager import license_manager
+    lic = license_manager.get_active_license()
+
+    status_color = "red" if lic.is_expired() else "green"
+    status_label = "EXPIRED" if lic.is_expired() else "ACTIVE"
+
+    table = Table(title="Veil Active Cryptographic License")
+    table.add_column("Property", style="cyan", no_wrap=True)
+    table.add_column("Value", style="bold white")
+
+    table.add_row("License ID", lic.license_id)
+    table.add_row("Commercial Tier", f"[bold yellow]{lic.tier.value}[/bold yellow]")
+    table.add_row("Status", f"[{status_color}]{status_label}[/{status_color}]")
+    table.add_row("Licensed To", lic.customer_email)
+    table.add_row("Issued At", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lic.issued_at)))
+    table.add_row("Expires At", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lic.expires_at)) if lic.expires_at else "Never (Perpetual / Free)")
+    table.add_row("Max Simultaneous Clients", str(lic.max_clients) if lic.max_clients < 900 else "Unlimited")
+    table.add_row("Entitled Features", ", ".join(f.value for f in lic.features))
+
+    console.print(table)
+
+
+@cli.command("activate")
+def activate_key(
+    key: str = typer.Argument(..., help="Cryptographically signed Veil license key string")
+):
+    """Activate a commercial Veil Pro or Enterprise license key."""
+    from app.licensing.manager import license_manager
+    valid, message, payload = license_manager.activate_license(key)
+
+    if valid and payload:
+        console.print(Panel.fit(
+            f"[bold green]LICENSE ACTIVATION SUCCESSFUL[/bold green]\n\n"
+            f"Tier:          [bold yellow]{payload.tier.value}[/bold yellow]\n"
+            f"License ID:    {payload.license_id}\n"
+            f"Customer:      {payload.customer_email}\n"
+            f"Expires:       {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(payload.expires_at)) if payload.expires_at else 'Never'}",
+            title="[bold green]Veil Licensing[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel.fit(
+            f"[bold red]ACTIVATION FAILED[/bold red]\n\n"
+            f"[white]{message}[/white]",
+            title="[bold red]Licensing Error[/bold red]",
+            border_style="red"
+        ))
+
+
+@cli.command("checkout")
+def checkout_cli(
+    email: str = typer.Option(..., "--email", "-e", help="Customer email for invoice and license issuance"),
+    tier: str = typer.Option("pro", "--tier", "-t", help="Target plan tier: pro or enterprise"),
+    currency: str = typer.Option("NGN", "--currency", "-c", help="Payment currency: NGN or USD")
+):
+    """Generate a Paystack checkout link to upgrade your plan."""
+    import asyncio
+    from app.licensing.models import LicenseTier
+    from app.billing.paystack import paystack_client
+    from app.billing.routes import PLAN_PRICING
+
+    target_tier = LicenseTier.PRO if tier.lower() == "pro" else LicenseTier.ENTERPRISE
+    curr = currency.upper() if currency.upper() in ("NGN", "USD") else "NGN"
+    amount = PLAN_PRICING[target_tier][curr]
+
+    async def _run_checkout():
+        return await paystack_client.initialize_transaction(
+            email=email,
+            amount=amount,
+            currency=curr,
+            metadata={"tier": target_tier.value, "email": email}
+        )
+
+    console.print(f"[bold cyan]Initializing {target_tier.value} checkout via Paystack ({curr})...[/bold cyan]")
+    success, res = asyncio.run(_run_checkout())
+
+    if success:
+        formatted_price = f"NGN {amount // 100:,}" if curr == "NGN" else f"${amount / 100:.2f}"
+        console.print(Panel.fit(
+            f"[bold green]CHECKOUT READY ({formatted_price} / month)[/bold green]\n\n"
+            f"Reference:  [bold yellow]{res['reference']}[/bold yellow]\n"
+            f"Payment URL:\n[bold cyan]{res['authorization_url']}[/bold cyan]\n\n"
+            f"[dim]Complete payment in your browser, then run: veil verify-payment {res['reference']}[/dim]",
+            title="[bold green]Paystack Checkout[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print(f"[bold red]Failed to create checkout: {res.get('error')}[/bold red]")
+
+
+@cli.command("verify-payment")
+def verify_payment_cli(
+    reference: str = typer.Argument(..., help="Paystack transaction reference to verify")
+):
+    """Verify a completed Paystack transaction reference and activate the license."""
+    import asyncio
+    from app.billing.paystack import paystack_client
+    from app.licensing.manager import license_manager
+    from app.licensing.models import LicenseTier
+
+    async def _verify():
+        return await paystack_client.verify_transaction(reference)
+
+    console.print(f"[bold cyan]Verifying transaction reference '{reference}'...[/bold cyan]")
+    success, txn = asyncio.run(_verify())
+
+    if success:
+        meta = txn.get("metadata", {})
+        tier_str = meta.get("tier", "PRO")
+        email = txn.get("customer", {}).get("email") or meta.get("email", "customer@veil.local")
+        tier_enum = LicenseTier.PRO if tier_str == "PRO" else LicenseTier.ENTERPRISE
+
+        key_str, payload = license_manager.issue_license(tier_enum, email, duration_days=30)
+        license_manager.activate_license(key_str)
+
+        console.print(Panel.fit(
+            f"[bold green]PAYMENT VERIFIED & PLAN ACTIVATED![/bold green]\n\n"
+            f"Tier:         [bold yellow]{tier_enum.value}[/bold yellow]\n"
+            f"Customer:     {email}\n"
+            f"License ID:   {payload.license_id}\n"
+            f"License Key:\n[bold cyan]{key_str}[/bold cyan]",
+            title="[bold green]Upgrade Complete[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print(f"[bold red]Verification failed: {txn.get('error')}[/bold red]")
+
+
 if __name__ == "__main__":
     cli()

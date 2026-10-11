@@ -48,6 +48,21 @@ class ClientManager:
                 message=f"Client '{client_id}' is not recognized by Veil.",
                 client_id=client_id
             )
+
+        # Enforce licensing connection limits (Free tier = 1 client max)
+        from app.licensing.enforcer import check_client_connection_limit
+        connected_count = sum(1 for a in self._adapters.values() if a.get_status().status.value == "CONNECTED")
+        current_status = adapter.get_status().status.value
+
+        if current_status != "CONNECTED":
+            allowed, limit_msg = check_client_connection_limit(connected_count, client_id)
+            if not allowed:
+                return MutationResult(
+                    success=False,
+                    message=limit_msg,
+                    client_id=client_id
+                )
+
         target_url = gateway_url or f"http://{settings.HOST}:{settings.PORT}/v1"
         return adapter.connect(target_url)
 

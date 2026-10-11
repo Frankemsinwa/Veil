@@ -236,6 +236,10 @@
       title: 'Semantic Guardrails & Knowledge Vault',
       crumb: 'On-Device Quantized ONNX Vector Defense • Zero Cloud Egress'
     },
+    billing: {
+      title: 'Commercial Plans & Licensing',
+      crumb: '3-Tier Protection Matrix • Paystack International Payment Gateway'
+    },
     settings: {
       title: 'System Settings',
       crumb: 'Host Integration & Port Management'
@@ -262,6 +266,7 @@
     setupEntityPresets();
     setupEntitySimulator();
     setupEntityFiltersAndExport();
+    setupBillingController();
 
     // Dynamically advance rolling 1-minute throughput window
     setInterval(() => {
@@ -2343,6 +2348,256 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  /**
+   * Billing & Licensing Controller
+   */
+  function setupBillingController() {
+    let currentCurrency = 'NGN';
+    let currentBillingStatus = null;
+
+    const elBtnCurrencyNgn = document.getElementById('btn-currency-ngn');
+    const elBtnCurrencyUsd = document.getElementById('btn-currency-usd');
+    const elProPrice = document.getElementById('pro-price-display');
+    const elEntPrice = document.getElementById('ent-price-display');
+    const elProPeriod = document.getElementById('pro-period-display');
+    const elEntPeriod = document.getElementById('ent-period-display');
+    const elBtnUpgradePro = document.getElementById('btn-upgrade-pro');
+    const elBtnContactEnt = document.getElementById('btn-contact-enterprise');
+    const elBtnPlanFree = document.getElementById('btn-plan-free');
+    const elTierBadge = document.getElementById('billing-tier-badge');
+    const elStatusSub = document.getElementById('billing-status-sub');
+    const elCustomerEmail = document.getElementById('billing-customer-email');
+    const elLicenseId = document.getElementById('billing-license-id');
+    const elNavTierBadge = document.getElementById('nav-plan-tier-badge');
+    const elInputKey = document.getElementById('input-license-key');
+    const elBtnSubmitKey = document.getElementById('btn-submit-license-key');
+    const elKeyFeedback = document.getElementById('license-key-feedback');
+    const elBtnOpenBox = document.getElementById('btn-open-activate-box');
+
+    function updateCurrencyDisplay() {
+      if (currentCurrency === 'NGN') {
+        if (elProPrice) elProPrice.innerText = '₦30,000';
+        if (elEntPrice) elEntPrice.innerText = '₦90,000';
+        if (elProPeriod) elProPeriod.innerText = '/ month';
+        if (elEntPeriod) elEntPeriod.innerText = '/ seat / month';
+        if (elBtnCurrencyNgn) elBtnCurrencyNgn.classList.add('active');
+        if (elBtnCurrencyUsd) elBtnCurrencyUsd.classList.remove('active');
+      } else {
+        if (elProPrice) elProPrice.innerText = '$20';
+        if (elEntPrice) elEntPrice.innerText = '$60';
+        if (elProPeriod) elProPeriod.innerText = '/ month';
+        if (elEntPeriod) elEntPeriod.innerText = '/ seat / month';
+        if (elBtnCurrencyNgn) elBtnCurrencyNgn.classList.remove('active');
+        if (elBtnCurrencyUsd) elBtnCurrencyUsd.classList.add('active');
+      }
+    }
+
+    if (elBtnCurrencyNgn) {
+      elBtnCurrencyNgn.addEventListener('click', () => {
+        currentCurrency = 'NGN';
+        updateCurrencyDisplay();
+      });
+    }
+    if (elBtnCurrencyUsd) {
+      elBtnCurrencyUsd.addEventListener('click', () => {
+        currentCurrency = 'USD';
+        updateCurrencyDisplay();
+      });
+    }
+
+    if (elBtnOpenBox) {
+      elBtnOpenBox.addEventListener('click', () => {
+        const box = document.getElementById('box-activate-key');
+        if (box) {
+          box.scrollIntoView({ behavior: 'smooth' });
+          if (elInputKey) elInputKey.focus();
+        }
+      });
+    }
+
+    async function fetchBillingStatus() {
+      try {
+        const res = await fetch('/api/billing/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        currentBillingStatus = data;
+
+        const tier = data.tier || 'FREE';
+        if (elNavTierBadge) {
+          elNavTierBadge.innerText = tier;
+          if (tier === 'PRO') {
+            elNavTierBadge.style.background = 'rgba(61, 214, 140, 0.2)';
+            elNavTierBadge.style.color = '#3dd68c';
+          } else if (tier === 'ENTERPRISE') {
+            elNavTierBadge.style.background = 'rgba(168, 85, 247, 0.2)';
+            elNavTierBadge.style.color = '#c084fc';
+          } else {
+            elNavTierBadge.style.background = 'rgba(14, 165, 233, 0.2)';
+            elNavTierBadge.style.color = '#38bdf8';
+          }
+        }
+
+        if (elTierBadge) {
+          elTierBadge.innerText = tier === 'FREE' ? 'SOLO / COMMUNITY' : `${tier} TIER`;
+          elTierBadge.className = tier === 'FREE' ? 'pill' : 'pill ok';
+        }
+        if (elStatusSub) {
+          if (data.is_expired) {
+            elStatusSub.innerText = 'License Expired (Falling back to Free)';
+            elStatusSub.style.color = '#f2555a';
+          } else if (data.expires_at) {
+            const expDate = new Date(data.expires_at * 1000).toLocaleDateString();
+            elStatusSub.innerText = `Active License (Renews ${expDate})`;
+            elStatusSub.style.color = '#3dd68c';
+          } else {
+            elStatusSub.innerText = 'Active Community License';
+            elStatusSub.style.color = 'var(--text-2)';
+          }
+        }
+        if (elCustomerEmail) elCustomerEmail.innerText = data.customer_email || 'developer@community.veil';
+        if (elLicenseId) elLicenseId.innerText = data.license_id || 'VL-FREE-COMMUNITY';
+
+        // Update action buttons based on active tier
+        if (elBtnPlanFree) {
+          if (tier === 'FREE') {
+            elBtnPlanFree.disabled = true;
+            elBtnPlanFree.innerText = 'Active Plan';
+            elBtnPlanFree.className = 'btn btn-secondary plan-btn';
+          } else {
+            elBtnPlanFree.disabled = true;
+            elBtnPlanFree.innerText = 'Included';
+            elBtnPlanFree.className = 'btn btn-secondary plan-btn';
+          }
+        }
+
+        if (elBtnUpgradePro) {
+          if (tier === 'PRO') {
+            elBtnUpgradePro.disabled = true;
+            elBtnUpgradePro.innerText = 'Active Plan ✓';
+            elBtnUpgradePro.className = 'btn btn-secondary plan-btn';
+          } else {
+            elBtnUpgradePro.disabled = false;
+            elBtnUpgradePro.innerText = 'Upgrade with Paystack';
+            elBtnUpgradePro.className = 'btn btn-primary plan-btn';
+          }
+        }
+
+        if (elBtnContactEnt) {
+          if (tier === 'ENTERPRISE') {
+            elBtnContactEnt.disabled = true;
+            elBtnContactEnt.innerText = 'Active Plan ✓';
+          } else {
+            elBtnContactEnt.disabled = false;
+            elBtnContactEnt.innerText = 'Contact Enterprise Sales';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load billing status:', err);
+      }
+    }
+
+    if (elBtnUpgradePro) {
+      elBtnUpgradePro.addEventListener('click', async () => {
+        const defaultEmail = (currentBillingStatus && currentBillingStatus.customer_email && !currentBillingStatus.customer_email.includes('.veil')) 
+          ? currentBillingStatus.customer_email 
+          : '';
+        const email = prompt('Enter your email address for the Paystack payment & license issuance:', defaultEmail);
+        if (!email || !email.includes('@')) {
+          if (email !== null) showToast('Invalid Email', 'Please provide a valid email address for your license receipt.', 'warning');
+          return;
+        }
+
+        elBtnUpgradePro.disabled = true;
+        elBtnUpgradePro.innerText = 'Connecting to Paystack...';
+
+        try {
+          const res = await fetch('/api/billing/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tier: 'PRO',
+              email: email.trim(),
+              currency: currentCurrency
+            })
+          });
+
+          const data = await res.json();
+          if (res.ok && data.authorization_url) {
+            showToast('Paystack Checkout Initialized', `Opening ${data.amount_formatted} payment session for ${email}...`, 'info');
+            window.open(data.authorization_url, '_blank');
+          } else {
+            showToast('Checkout Error', data.detail || 'Could not initiate checkout session.', 'error');
+          }
+        } catch (err) {
+          showToast('Network Error', err.message, 'error');
+        } finally {
+          elBtnUpgradePro.disabled = false;
+          elBtnUpgradePro.innerText = 'Upgrade with Paystack';
+          fetchBillingStatus();
+        }
+      });
+    }
+
+    if (elBtnSubmitKey && elInputKey) {
+      elBtnSubmitKey.addEventListener('click', async () => {
+        const key = elInputKey.value.trim();
+        if (!key) {
+          if (elKeyFeedback) {
+            elKeyFeedback.style.color = '#f2555a';
+            elKeyFeedback.innerText = 'Please enter a license key string.';
+          }
+          return;
+        }
+
+        elBtnSubmitKey.disabled = true;
+        elBtnSubmitKey.innerText = 'Activating...';
+        if (elKeyFeedback) elKeyFeedback.innerText = '';
+
+        try {
+          const res = await fetch('/api/billing/activate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ license_key: key })
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            if (elKeyFeedback) {
+              elKeyFeedback.style.color = '#3dd68c';
+              elKeyFeedback.innerText = `✓ ${data.message} (${data.tier} Tier unlocked)`;
+            }
+            showToast('License Activated', `Successfully unlocked ${data.tier} features!`, 'success');
+            elInputKey.value = '';
+            fetchBillingStatus();
+          } else {
+            if (elKeyFeedback) {
+              elKeyFeedback.style.color = '#f2555a';
+              elKeyFeedback.innerText = `✕ Error: ${data.detail || 'License verification failed'}`;
+            }
+            showToast('Activation Failed', data.detail || 'Invalid or tampered license key.', 'error');
+          }
+        } catch (err) {
+          if (elKeyFeedback) {
+            elKeyFeedback.style.color = '#f2555a';
+            elKeyFeedback.innerText = `✕ Network error: ${err.message}`;
+          }
+        } finally {
+          elBtnSubmitKey.disabled = false;
+          elBtnSubmitKey.innerText = 'Activate Key';
+        }
+      });
+    }
+
+    if (elBtnContactEnt) {
+      elBtnContactEnt.addEventListener('click', () => {
+        alert('For Enterprise Fleet licensing, centralized policy sync, and silent MSI Intune deployment, please email: frankemesinwa@gmail.com');
+      });
+    }
+
+    updateCurrencyDisplay();
+    fetchBillingStatus();
   }
 
   // Boot on DOM ready

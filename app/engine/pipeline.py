@@ -16,6 +16,8 @@ from app.engine.knowledge_vault import knowledge_vault, KnowledgeVectorVault
 from app.engine.vector_encoder import vector_encoder, LocalVectorEncoder
 from app.core.exceptions import SemanticViolationException
 from app.core.circuit_breaker import CircuitBreaker
+from app.licensing.models import FeatureFlag
+from app.licensing.enforcer import is_feature_allowed
 
 
 class InspectionPipeline:
@@ -63,12 +65,14 @@ class InspectionPipeline:
             # 2. Shannon Entropy Scanning for unclassified secrets
             entropy_spans = self.entropy_scanner.scan(text)
 
-            # 3. Enterprise Custom Entity Dictionary
-            custom_spans = self.custom_dict.scan(text)
+            # 3. Enterprise Custom Entity Dictionary (Pro/Enterprise tier)
+            custom_spans = []
+            if is_feature_allowed(FeatureFlag.CUSTOM_DICTIONARY):
+                custom_spans = self.custom_dict.scan(text)
 
-            # 4. Local Dense Vector & Embedding Guardrails (Phase 3)
+            # 4. Local Dense Vector & Embedding Guardrails (Pro/Enterprise tier)
             vector_spans = []
-            if settings.VECTOR_GUARDRAILS_ENABLED:
+            if settings.VECTOR_GUARDRAILS_ENABLED and is_feature_allowed(FeatureFlag.VECTOR_GUARDRAILS):
                 vector_spans = self._scan_vector_guardrails(text)
 
             # 5. Combine raw candidate spans
@@ -83,9 +87,9 @@ class InspectionPipeline:
             # 8. Apply Policy Decision on deterministic & vector spans (raises SecretDetectedException on BLOCK)
             decisions, redact_spans = self.policy_engine.evaluate(merged_spans)
 
-            # 9. Semantic ML Classification (Phase 10)
+            # 9. Semantic ML Classification (Pro/Enterprise tier)
             semantic_result: Optional[SemanticClassificationResult] = None
-            if settings.SEMANTIC_CLASSIFIER_ENABLED:
+            if settings.SEMANTIC_CLASSIFIER_ENABLED and is_feature_allowed(FeatureFlag.VECTOR_GUARDRAILS):
                 semantic_result = self.semantic_classifier.classify_sync(text)
                 # Evaluates policy (raises SemanticViolationException on strict blocking violations)
                 self.policy_engine.evaluate_semantic(semantic_result)
