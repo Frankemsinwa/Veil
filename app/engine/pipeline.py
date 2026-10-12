@@ -37,7 +37,7 @@ class InspectionPipeline:
         self.semantic_classifier = SemanticClassifier()
         self.knowledge_vault = vault or knowledge_vault
         self.vector_encoder = encoder or vector_encoder
-        self.breaker = CircuitBreaker("inspection_pipeline", max_duration_ms=1000.0)
+        self.breaker = CircuitBreaker("inspection_pipeline", max_duration_ms=3000.0)
 
     def inspect(self, text: str) -> Tuple[List[PolicyDecision], List[DetectedSpan]]:
         """Run complete inspection on input text.
