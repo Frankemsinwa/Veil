@@ -2596,6 +2596,132 @@
       });
     }
 
+    // ------------------ Phase 1: Transparent Proxy & Root CA UI ------------------
+    const switchSystemProxy = document.getElementById('switch-system-proxy');
+    const settingsProxyToggle = document.getElementById('settings-proxy-toggle');
+    const settingsCaPill = document.getElementById('settings-ca-pill');
+    const btnToggleCa = document.getElementById('btn-toggle-ca');
+    const systemProxyHint = document.getElementById('system-proxy-hint');
+
+    let currentProxyStatus = {
+      system_proxy_enabled: false,
+      ca_installed: false,
+      host: '127.0.0.1',
+      port: 8888
+    };
+
+    function updateProxyUI(data) {
+      currentProxyStatus = data;
+      const isEnabled = Boolean(data.system_proxy_enabled);
+      const isCaInstalled = Boolean(data.ca_installed);
+
+      [switchSystemProxy, settingsProxyToggle].forEach(sw => {
+        if (!sw) return;
+        sw.setAttribute('aria-checked', isEnabled ? 'true' : 'false');
+        if (isEnabled) {
+          sw.classList.add('active');
+        } else {
+          sw.classList.remove('active');
+        }
+      });
+
+      if (systemProxyHint) {
+        if (isEnabled) {
+          systemProxyHint.innerHTML = `<span style="color: var(--emerald);">● Active:</span> Intercepting AI traffic on <b>${data.host}:${data.port}</b>.`;
+        } else {
+          systemProxyHint.innerHTML = `Transparent AI interception on <b>${data.host}:${data.port}</b> (OpenAI, Anthropic, Gemini, Cursor).`;
+        }
+      }
+
+      if (settingsCaPill) {
+        if (isCaInstalled) {
+          settingsCaPill.textContent = 'TRUSTED';
+          settingsCaPill.className = 'pill ok';
+        } else {
+          settingsCaPill.textContent = 'NOT INSTALLED';
+          settingsCaPill.className = 'pill bad';
+        }
+      }
+
+      if (btnToggleCa) {
+        btnToggleCa.textContent = isCaInstalled ? 'Uninstall CA' : 'Install CA';
+        btnToggleCa.className = isCaInstalled ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm';
+      }
+    }
+
+    async function fetchProxyStatus() {
+      try {
+        const res = await fetch('/api/proxy/status');
+        if (res.ok) {
+          const data = await res.json();
+          updateProxyUI(data);
+        }
+      } catch (err) {
+        console.debug('Failed to fetch proxy status:', err);
+      }
+    }
+
+    async function toggleSystemProxy() {
+      [switchSystemProxy, settingsProxyToggle].forEach(sw => {
+        if (sw) sw.disabled = true;
+      });
+
+      try {
+        const res = await fetch('/api/proxy/toggle', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(
+            data.enabled ? 'System Proxy Activated' : 'System Proxy Deactivated',
+            data.enabled ? 'ok' : 'info',
+            data.message
+          );
+          fetchProxyStatus();
+        } else {
+          showToast('Proxy Error', 'bad', data.detail || 'Could not toggle system proxy.');
+        }
+      } catch (err) {
+        showToast('Network Error', 'bad', err.message);
+      } finally {
+        [switchSystemProxy, settingsProxyToggle].forEach(sw => {
+          if (sw) sw.disabled = false;
+        });
+      }
+    }
+
+    if (switchSystemProxy) {
+      switchSystemProxy.addEventListener('click', toggleSystemProxy);
+    }
+    if (settingsProxyToggle) {
+      settingsProxyToggle.addEventListener('click', toggleSystemProxy);
+    }
+
+    if (btnToggleCa) {
+      btnToggleCa.addEventListener('click', async () => {
+        btnToggleCa.disabled = true;
+        const action = currentProxyStatus.ca_installed ? 'uninstall' : 'install';
+        try {
+          const res = await fetch(`/api/proxy/ca/${action}`, { method: 'POST' });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            showToast(
+              action === 'install' ? 'Root CA Installed' : 'Root CA Removed',
+              'ok',
+              data.message
+            );
+          } else {
+            showToast('CA Operation Note', 'warn', data.message || 'Operation did not complete.');
+          }
+        } catch (err) {
+          showToast('CA Error', 'bad', err.message);
+        } finally {
+          btnToggleCa.disabled = false;
+          fetchProxyStatus();
+        }
+      });
+    }
+
+    fetchProxyStatus();
+
     updateCurrencyDisplay();
     fetchBillingStatus();
   }

@@ -228,6 +228,13 @@
             <div class="status-controls">
               <div class="control">
                 <div class="control-row">
+                  <span class="control-label">Windows System Proxy</span>
+                  <button class="switch" id="switch-system-proxy" aria-checked="false" aria-label="Toggle System Proxy"></button>
+                </div>
+                <p class="control-hint" id="system-proxy-hint">1-click transparent AI interception on 127.0.0.1:8888 (OpenAI, Gemini, Anthropic, Cursor).</p>
+              </div>
+              <div class="control">
+                <div class="control-row">
                   <span class="control-label">Gateway Engine</span>
                   <button class="switch" id="switch-gateway-active" aria-checked="true" aria-label="Toggle Gateway"></button>
                 </div>
@@ -1066,8 +1073,27 @@
 
             <div class="setting">
               <div>
-                <div class="setting-title">Local Proxy Binding</div>
-                <div class="setting-desc">The local loopback port where IDE clients route their completions and messages.</div>
+                <div class="setting-title">Transparent Windows System Proxy</div>
+                <div class="setting-desc">Zero-config systemwide proxy (127.0.0.1:8888) intercepting outbound AI calls without manual IDE settings.</div>
+              </div>
+              <button class="switch" id="settings-proxy-toggle" aria-checked="false" aria-label="Toggle System Proxy"></button>
+            </div>
+
+            <div class="setting">
+              <div>
+                <div class="setting-title">Local Root Certificate Authority (CA)</div>
+                <div class="setting-desc">Device-unique X.509 root certificate trusted in CurrentUser store for dynamic SSL inspection.</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="pill" id="settings-ca-pill">Checking...</span>
+                <button class="btn btn-secondary btn-sm" id="btn-toggle-ca">Install CA</button>
+              </div>
+            </div>
+
+            <div class="setting">
+              <div>
+                <div class="setting-title">Local Gateway Endpoint (Direct Mode)</div>
+                <div class="setting-desc">The local drop-in endpoint for IDEs configured directly (Mode B).</div>
               </div>
               <div class="copy-field">
                 <span>http://127.0.0.1:8080/v1</span>

@@ -117,6 +117,21 @@ class Settings(BaseSettings):
         description="Local directory for encrypted audit ledgers and configs"
     )
 
+    # Transparent System Proxy (Phase 1)
+    PROXY_ENABLED: bool = Field(default=True, description="Enable transparent HTTP/HTTPS proxy engine")
+    PROXY_HOST: str = Field(default="127.0.0.1", description="Bind address for transparent proxy")
+    PROXY_PORT: int = Field(default=8888, description="Listening port for transparent proxy")
+    INTERCEPT_DOMAINS: list[str] = Field(
+        default=[
+            "api.openai.com",
+            "api.anthropic.com",
+            "generativelanguage.googleapis.com",
+            "daily-cloudcode-pa.googleapis.com",
+            "api.cursor.sh",
+        ],
+        description="Domains subject to dynamic SSL termination and inspection"
+    )
+
 
 
 settings = Settings()

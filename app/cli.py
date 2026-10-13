@@ -533,5 +533,118 @@ def verify_payment_cli(
         console.print(f"[bold red]Verification failed: {txn.get('error')}[/bold red]")
 
 
+
+# ------------------ Phase 1: Transparent Proxy & CA CLI ------------------
+
+proxy_cli = typer.Typer(
+    name="proxy",
+    help="Manage Windows System Proxy and Local Certificate Authority (Zero-Config Interception)",
+    add_completion=False
+)
+cli.add_typer(proxy_cli, name="proxy")
+
+
+@proxy_cli.command("status")
+def proxy_status_cli():
+    """Display the current status of the Windows System Proxy and Veil Root CA."""
+    from app.proxy.ca import ca_instance
+    from app.proxy.wininet import proxy_manager
+    from app.proxy.interceptor import transparent_proxy_server
+
+    win_status = proxy_manager.get_status()
+    ca_installed = ca_instance.is_root_ca_installed()
+
+    table = Table(title="Veil Transparent System Proxy Status")
+    table.add_column("Property", style="cyan", no_wrap=True)
+    table.add_column("Value", style="bold white")
+
+    proxy_style = "bold green" if win_status.get("enabled") else "bold yellow"
+    table.add_row("Windows System Proxy", f"[{proxy_style}]{'ENABLED' if win_status.get('enabled') else 'DISABLED'}[/{proxy_style}]")
+    table.add_row("Proxy Target Server", str(win_status.get("server") or f"{settings.PROXY_HOST}:{settings.PROXY_PORT}"))
+    table.add_row("Proxy Bypass Rules", str(win_status.get("override") or "None"))
+
+    ca_style = "bold green" if ca_installed else "bold red"
+    table.add_row("Root CA Trusted", f"[{ca_style}]{'YES (Installed)' if ca_installed else 'NO (Run: veil proxy install-ca)'}[/{ca_style}]")
+    table.add_row("Root CA Cert Path", str(ca_instance.ca_cert_path))
+    table.add_row("Intercepted Domains", ", ".join(transparent_proxy_server.classifier.intercepted_domains))
+
+    console.print(table)
+
+
+@proxy_cli.command("enable")
+def proxy_enable_cli(
+    server: str = typer.Option(f"{settings.PROXY_HOST}:{settings.PROXY_PORT}", "--server", "-s", help="Proxy address:port")
+):
+    """Enable Windows System Proxy pointing to Veil (1-click transparent AI interception)."""
+    from app.proxy.ca import ca_instance
+    from app.proxy.wininet import proxy_manager
+
+    # Ensure Root CA is installed
+    if not ca_instance.is_root_ca_installed():
+        console.print("[bold yellow]Root CA not detected in trust store. Installing Veil Root CA...[/bold yellow]")
+        success, msg = ca_instance.install_root_ca()
+        if success:
+            console.print(f"[bold green][OK] {msg}[/bold green]")
+        else:
+            console.print(f"[bold red][FAIL] Failed to install CA: {msg}[/bold red]")
+
+    ok = proxy_manager.enable_proxy(server=server)
+    if ok:
+        console.print(Panel.fit(
+            f"[bold green]SYSTEM PROXY ACTIVATED[/bold green]\n\n"
+            f"All outbound AI traffic will now route transparently through Veil at [bold cyan]{server}[/bold cyan].\n"
+            f"Zero manual configuration required in OpenCode, Cursor, Continue, or browsers.\n\n"
+            f"[dim]Run 'veil proxy disable' to restore normal network settings at any time.[/dim]",
+            title="[bold green]Shield Active[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print("[bold red]Failed to enable Windows System Proxy.[/bold red]")
+
+
+@proxy_cli.command("disable")
+def proxy_disable_cli():
+    """Disable Windows System Proxy and restore direct network access."""
+    from app.proxy.wininet import proxy_manager
+
+    ok = proxy_manager.disable_proxy()
+    if ok:
+        console.print(Panel.fit(
+            f"[bold yellow]SYSTEM PROXY DEACTIVATED[/bold yellow]\n\n"
+            f"Windows network settings restored to direct bypass mode.",
+            title="[bold yellow]Shield Standby[/bold yellow]",
+            border_style="yellow"
+        ))
+    else:
+        console.print("[bold red]Failed to disable Windows System Proxy.[/bold red]")
+
+
+@proxy_cli.command("install-ca")
+def proxy_install_ca_cli():
+    """Install and trust Veil Root CA in the CurrentUser certificate store."""
+    from app.proxy.ca import ca_instance
+
+    console.print("[bold cyan]Installing Veil Root CA into Windows CurrentUser root store...[/bold cyan]")
+    success, msg = ca_instance.install_root_ca()
+    if success:
+        console.print(f"[bold green][OK] {msg}[/bold green]")
+    else:
+        console.print(f"[bold red][FAIL] {msg}[/bold red]")
+
+
+@proxy_cli.command("uninstall-ca")
+def proxy_uninstall_ca_cli():
+    """Uninstall Veil Root CA from the CurrentUser certificate store."""
+    from app.proxy.ca import ca_instance
+
+    console.print("[bold cyan]Removing Veil Root CA from Windows CurrentUser root store...[/bold cyan]")
+    success, msg = ca_instance.uninstall_root_ca()
+    if success:
+        console.print(f"[bold green][OK] {msg}[/bold green]")
+    else:
+        console.print(f"[bold red][FAIL] {msg}[/bold red]")
+
+
 if __name__ == "__main__":
     cli()
+

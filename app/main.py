@@ -58,7 +58,26 @@ async def lifespan(app: FastAPI):
     install_log_scrubber()
     # Pre-warm local quantized embedding models in a thread to ensure zero cold-start delay
     asyncio.create_task(asyncio.to_thread(_warmup_models))
+
+    # Start Transparent Proxy Server (Phase 1)
+    if settings.PROXY_ENABLED:
+        from app.proxy import transparent_proxy_server
+        try:
+            await transparent_proxy_server.start()
+        except Exception as e:
+            import logging
+            logging.getLogger("veil.proxy").warning("Failed to start transparent proxy: %s", e)
+
     yield
+
+    if settings.PROXY_ENABLED:
+        from app.proxy import transparent_proxy_server, proxy_manager
+        try:
+            proxy_manager.disable_proxy()
+            await transparent_proxy_server.stop()
+        except Exception:
+            pass
+
     await openai_adapter.close()
     await anthropic_adapter.close()
     await ollama_adapter.close()
@@ -178,6 +197,76 @@ async def disconnect_client_endpoint(client_id: str):
             "status": "DETECTED"
         })
     return result.model_dump()
+
+
+# ------------------ Phase 1: Transparent System Proxy API ------------------
+
+@app.get("/api/proxy/status")
+async def get_proxy_status():
+    """Returns transparent proxy server state, Windows WinINet configuration, and CA status."""
+    from app.proxy import transparent_proxy_server, proxy_manager, ca_instance
+    win_status = proxy_manager.get_status()
+    ca_installed = ca_instance.is_root_ca_installed()
+    return {
+        "proxy_running": transparent_proxy_server.is_running,
+        "system_proxy_enabled": win_status.get("enabled", False),
+        "system_proxy_server": win_status.get("server"),
+        "ca_installed": ca_installed,
+        "host": transparent_proxy_server.host,
+        "port": transparent_proxy_server.port,
+        "intercepted_domains": transparent_proxy_server.classifier.intercepted_domains,
+        "stats": transparent_proxy_server.stats,
+    }
+
+
+@app.post("/api/proxy/toggle")
+async def toggle_system_proxy():
+    """1-Click toggle Windows System Proxy pointing to Veil transparent proxy."""
+    from app.proxy import transparent_proxy_server, proxy_manager, ca_instance
+    current = proxy_manager.get_status()
+    currently_enabled = current.get("enabled", False)
+
+    if currently_enabled:
+        proxy_manager.disable_proxy()
+        enabled = False
+        message = "Windows System Proxy disabled."
+    else:
+        # If CA is not installed, attempt to install it
+        if not ca_instance.is_root_ca_installed():
+            ca_instance.install_root_ca()
+
+        server_addr = f"{transparent_proxy_server.host}:{transparent_proxy_server.port}"
+        proxy_manager.enable_proxy(server=server_addr)
+        enabled = True
+        message = f"Windows System Proxy enabled pointing to {server_addr}."
+
+    privacy_event_bus.publish_sync("metric", {
+        "action": "proxy_toggled",
+        "enabled": enabled,
+    })
+
+    return {
+        "success": True,
+        "enabled": enabled,
+        "message": message,
+        "status": await get_proxy_status(),
+    }
+
+
+@app.post("/api/proxy/ca/install")
+async def install_root_ca_endpoint():
+    """Installs Veil device-unique Root CA into Windows CurrentUser Root store."""
+    from app.proxy import ca_instance
+    success, message = ca_instance.install_root_ca()
+    return {"success": success, "message": message, "installed": ca_instance.is_root_ca_installed()}
+
+
+@app.post("/api/proxy/ca/uninstall")
+async def uninstall_root_ca_endpoint():
+    """Removes Veil Root CA from Windows CurrentUser Root store."""
+    from app.proxy import ca_instance
+    success, message = ca_instance.uninstall_root_ca()
+    return {"success": success, "message": message, "installed": ca_instance.is_root_ca_installed()}
 
 
 @app.get("/api/metrics")
