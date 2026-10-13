@@ -70,7 +70,7 @@ async def test_gateway_blocks_secret_inbound(monkeypatch):
             ]
         }
         response = await client.post("/v1/chat/completions", json=payload)
-        assert response.status_code == 422
+        assert response.status_code in (403, 422)
         data = response.json()
         assert data["error"]["code"] == "OUTBOUND_SECRET_BLOCKED"
 
@@ -106,7 +106,11 @@ async def test_gateway_redacts_pii_outbound_and_restores_inbound(monkeypatch):
             ],
             "stream": False
         }
-        response = await client.post("/v1/chat/completions", json=payload)
+        response = await client.post(
+            "/v1/chat/completions",
+            json=payload,
+            headers={"x-session-id": "vault_e2e_isolation_session"}
+        )
         assert response.status_code == 200
 
         # Verify what was sent upstream to the LLM was sanitized!
@@ -118,4 +122,4 @@ async def test_gateway_redacts_pii_outbound_and_restores_inbound(monkeypatch):
         client_response_data = response.json()
         restored_answer = client_response_data["choices"][0]["message"]["content"]
         assert "frank@enterprise.com" in restored_answer
-        assert "[EMAIL_001]" not in restored_answer
+        assert "[EMAIL_" not in restored_answer

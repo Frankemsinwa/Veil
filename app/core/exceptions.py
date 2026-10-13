@@ -9,7 +9,7 @@ class VeilSecurityException(Exception):
         code: str,
         message: str,
         violations: Optional[List[Dict[str, Any]]] = None,
-        status_code: int = 422
+        status_code: int = 403
     ):
         super().__init__(message)
         self.code = code
@@ -18,11 +18,13 @@ class VeilSecurityException(Exception):
         self.status_code = status_code
 
     def to_dict(self) -> Dict[str, Any]:
+        prefix = "🛡️ BLOCKED BY VEIL: " if not self.message.startswith("🛡️") else ""
         return {
             "error": {
-                "type": "veil_security_violation",
+                "message": f"{prefix}{self.message}",
+                "type": "privacy_violation_error",
                 "code": self.code,
-                "message": self.message,
+                "veil_code": "veil_blocked",
                 "details": self.violations
             }
         }
@@ -30,28 +32,28 @@ class VeilSecurityException(Exception):
 
 class SecretDetectedException(VeilSecurityException):
     """Raised when high-severity credentials or secrets are detected in outbound traffic."""
-    def __init__(self, violations: List[Dict[str, Any]]):
+    def __init__(self, violations: List[Dict[str, Any]], status_code: int = 403):
         super().__init__(
             code="OUTBOUND_SECRET_BLOCKED",
-            message="Outbound prompt blocked by local Veil security policy. Confidential secrets were detected.",
+            message="Outbound prompt blocked by enterprise policy. Confidential credentials were detected.",
             violations=violations,
-            status_code=422
+            status_code=status_code
         )
 
 
 class SemanticViolationException(VeilSecurityException):
     """Raised when outbound prompt contains contextual proprietary or confidential information under strict policy."""
-    def __init__(self, category: str, confidence: float, indicators: List[str], rationale: str):
+    def __init__(self, category: str, confidence: float, indicators: List[str], rationale: str, status_code: int = 403):
         super().__init__(
             code="OUTBOUND_PROPRIETARY_DATA_BLOCKED",
-            message=f"Outbound prompt blocked by local Veil policy. Contextual semantic sensitivity detected: {category} (confidence: {confidence:.2f}).",
+            message=f"Outbound prompt blocked by local vector policy ({category}, confidence: {confidence:.2f}).",
             violations=[{
                 "category": category,
                 "confidence": confidence,
                 "indicators": indicators,
                 "rationale": rationale
             }],
-            status_code=422
+            status_code=status_code
         )
 
 

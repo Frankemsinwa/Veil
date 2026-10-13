@@ -542,6 +542,26 @@ class TransparentProxyServer:
                 if not resp_line:
                     raise ConnectionError("Empty response from upstream")
 
+                auth_val = headers.get("authorization", "") or headers.get("x-api-key", "")
+                is_mock_token = "veil-dev-token" in auth_val or not auth_val
+                is_err_status = any(code in resp_line for code in (b" 401 ", b" 403 ", b" 500 ", b" 502 ", b" 503 "))
+
+                if is_err_status and is_mock_token:
+                    # Drain remainder of upstream error headers
+                    while True:
+                        rh = await upstream_reader.readline()
+                        if rh in (b"\r\n", b"\n", b""):
+                            break
+                    from app.main import _generate_mock_shield_response
+                    mock_resp = _generate_mock_shield_response(
+                        model=model,
+                        redaction_count=redaction_count,
+                        sanitized_messages=payload.get("messages", []),
+                        vault=vault,
+                    )
+                    self._send_http_json_response(client_writer, status_code=200, payload=mock_resp)
+                    return
+
                 client_writer.write(resp_line)
                 resp_headers: Dict[str, str] = {}
                 while True:

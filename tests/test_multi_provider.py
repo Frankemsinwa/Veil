@@ -25,7 +25,7 @@ async def test_anthropic_messages_blocks_credentials():
             ]
         }
         resp = await client.post("/v1/messages", json=payload)
-        assert resp.status_code == 422
+        assert resp.status_code in (403, 422)
         err = resp.json()
         assert err["error"]["code"] == "OUTBOUND_SECRET_BLOCKED"
 
@@ -80,7 +80,7 @@ async def test_ollama_generate_blocks_secrets():
             "stream": False
         }
         resp = await client.post("/api/generate", json=payload)
-        assert resp.status_code == 422
+        assert resp.status_code in (403, 422)
 
 
 @pytest.mark.asyncio

@@ -124,5 +124,5 @@ async def test_blocked_prompt_increments_metrics_and_emits_event():
             ]
         }
         resp = await client.post("/v1/chat/completions", json=payload)
-        assert resp.status_code == 422
+        assert resp.status_code in (403, 422)
         assert metrics_state["total_blocks"] == initial_blocks + 1

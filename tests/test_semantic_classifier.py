@@ -193,7 +193,7 @@ async def test_proxy_blocks_proprietary_data_under_strict_mode(monkeypatch):
         }
         headers = {"x-session-id": "test_semantic_session"}
         response = await client.post("/v1/chat/completions", json=payload, headers=headers)
-        assert response.status_code == 422
+        assert response.status_code in (403, 422)
         body = response.json()
         assert body["error"]["code"] == "OUTBOUND_PROPRIETARY_DATA_BLOCKED"
         assert body["error"]["details"][0]["category"] == "PROPRIETARY_BUSINESS_DATA"

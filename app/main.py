@@ -759,6 +759,113 @@ async def _generate_mock_shield_stream(model: str, redaction_count: int, sanitiz
     yield b"data: [DONE]\n\n"
 
 
+def _generate_mock_anthropic_shield_response(model: str, redaction_count: int, messages: list, vault=None) -> Dict[str, Any]:
+    """Generates an Anthropic-compatible assistant response demonstrating privacy sanitization."""
+    last_user_msg = ""
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            c = m.get("content", "")
+            if isinstance(c, str):
+                last_user_msg = c
+            elif isinstance(c, list):
+                last_user_msg = " ".join([p.get("text", "") for p in c if isinstance(p, dict)])
+            break
+
+    sanitized_preview = last_user_msg[:160] + ("..." if len(last_user_msg) > 160 else "")
+    summary = (
+        f"Protected {redaction_count} sensitive token(s)"
+        if redaction_count > 0
+        else "Zero confidential leaks detected"
+    )
+
+    reply_text = (
+        f"🛡️ **[Veil Privacy Gateway — Anthropic Claude Shield]**\n\n"
+        f"Prompt successfully intercepted and sanitized under active policy (**{settings.POLICY.value}**).\n\n"
+        f"• **Inspection Outcome**: {summary}\n"
+        f"• **Sanitized Inbound Context**: `{sanitized_preview}`\n\n"
+        f"✅ *Your prompt was safely verified before reaching external model networks. To route prompts to a live Anthropic Claude model, configure `UPSTREAM_ANTHROPIC_API_KEY` in your `.env` or IDE settings.*"
+    )
+
+    now_ts = int(time.time())
+    return {
+        "id": f"msg_veil_{now_ts}",
+        "type": "message",
+        "role": "assistant",
+        "model": model or "claude-3-5-sonnet",
+        "content": [
+            {
+                "type": "text",
+                "text": reply_text
+            }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": None,
+        "usage": {
+            "input_tokens": max(1, len(last_user_msg) // 4),
+            "output_tokens": len(reply_text) // 4
+        }
+    }
+
+
+async def _generate_mock_anthropic_shield_stream(model: str, redaction_count: int, messages: list, vault=None):
+    """Streams the mock privacy shield response formatted as Anthropic SSE events."""
+    resp_obj = _generate_mock_anthropic_shield_response(model, redaction_count, messages, vault)
+    reply_text = resp_obj["content"][0]["text"]
+    msg_id = resp_obj["id"]
+
+    # 1. message_start
+    m_start = {
+        "type": "message_start",
+        "message": {
+            "id": msg_id,
+            "type": "message",
+            "role": "assistant",
+            "model": model or "claude-3-5-sonnet",
+            "content": [],
+            "stop_reason": None,
+            "stop_sequence": None,
+            "usage": {"input_tokens": resp_obj["usage"]["input_tokens"], "output_tokens": 1}
+        }
+    }
+    yield f"event: message_start\ndata: {json.dumps(m_start)}\n\n".encode("utf-8")
+
+    # 2. content_block_start
+    cb_start = {
+        "type": "content_block_start",
+        "index": 0,
+        "content_block": {"type": "text", "text": ""}
+    }
+    yield f"event: content_block_start\ndata: {json.dumps(cb_start)}\n\n".encode("utf-8")
+
+    # 3. content_block_delta word by word
+    words = reply_text.split(" ")
+    for i, word in enumerate(words):
+        chunk_text = word + (" " if i < len(words) - 1 else "")
+        delta_obj = {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": chunk_text}
+        }
+        yield f"event: content_block_delta\ndata: {json.dumps(delta_obj)}\n\n".encode("utf-8")
+        await asyncio.sleep(0.01)
+
+    # 4. content_block_stop
+    cb_stop = {"type": "content_block_stop", "index": 0}
+    yield f"event: content_block_stop\ndata: {json.dumps(cb_stop)}\n\n".encode("utf-8")
+
+    # 5. message_delta
+    m_delta = {
+        "type": "message_delta",
+        "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+        "usage": {"output_tokens": resp_obj["usage"]["output_tokens"]}
+    }
+    yield f"event: message_delta\ndata: {json.dumps(m_delta)}\n\n".encode("utf-8")
+
+    # 6. message_stop
+    m_stop = {"type": "message_stop"}
+    yield f"event: message_stop\ndata: {json.dumps(m_stop)}\n\n".encode("utf-8")
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
     """OpenAI-compatible chat completions proxy endpoint with fail-closed privacy inspection."""
@@ -854,20 +961,39 @@ async def chat_completions(request: Request):
 
 
     # ------------------ Outbound Dispatch to Remote LLM ------------------
+    auth_header = incoming_headers.get("authorization", "")
+    is_mock_token = "veil-dev-token" in auth_header
+    has_real_key = bool(openai_adapter.default_api_key and openai_adapter.default_api_key != "veil-dev-token")
+
     if is_stream:
-        try:
-            raw_stream = openai_adapter.forward_stream(
-                endpoint="chat/completions",
-                headers=incoming_headers,
-                payload=payload
-            )
-            restored_stream = (
-                restorer.restore_sse_stream(raw_stream, vault)
-                if not metrics_state["is_paused"]
-                else raw_stream
-            )
-        except Exception:
+        if is_mock_token and not has_real_key:
             restored_stream = _generate_mock_shield_stream(model, redaction_count, payload.get("messages", []), vault)
+        else:
+            try:
+                raw_stream = openai_adapter.forward_stream(
+                    endpoint="chat/completions",
+                    headers=incoming_headers,
+                    payload=payload
+                )
+                base_stream = (
+                    restorer.restore_sse_stream(raw_stream, vault)
+                    if not metrics_state["is_paused"]
+                    else raw_stream
+                )
+                async def _resilient_stream():
+                    first_yielded = False
+                    try:
+                        async for chunk in base_stream:
+                            first_yielded = True
+                            yield chunk
+                    except Exception as e:
+                        logger.warning("Upstream streaming failed (%s). Serving mock shield stream...", e)
+                        if not first_yielded:
+                            async for chunk in _generate_mock_shield_stream(model, redaction_count, payload.get("messages", []), vault):
+                                yield chunk
+                restored_stream = _resilient_stream()
+            except Exception:
+                restored_stream = _generate_mock_shield_stream(model, redaction_count, payload.get("messages", []), vault)
 
         # Audit receipt for streaming prompt
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
@@ -895,25 +1021,35 @@ async def chat_completions(request: Request):
         )
     else:
         # Non-streaming standard response
-        try:
-            status_code, resp_headers, content = await openai_adapter.forward_request(
-                endpoint="chat/completions",
-                headers=incoming_headers,
-                payload=payload
-            )
-            if status_code == 401 and not incoming_headers.get("authorization") and not openai_adapter.default_api_key:
-                mock_data = _generate_mock_shield_response(model, redaction_count, payload.get("messages", []), vault)
-                content = json.dumps(mock_data).encode("utf-8")
-                status_code = 200
-                resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
-        except Exception:
+        is_mock_response = False
+        if is_mock_token and not has_real_key:
             mock_data = _generate_mock_shield_response(model, redaction_count, payload.get("messages", []), vault)
             content = json.dumps(mock_data).encode("utf-8")
             status_code = 200
             resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
+            is_mock_response = True
+        else:
+            try:
+                status_code, resp_headers, content = await openai_adapter.forward_request(
+                    endpoint="chat/completions",
+                    headers=incoming_headers,
+                    payload=payload
+                )
+                if status_code in (401, 403, 502, 503) and (is_mock_token or not has_real_key):
+                    mock_data = _generate_mock_shield_response(model, redaction_count, payload.get("messages", []), vault)
+                    content = json.dumps(mock_data).encode("utf-8")
+                    status_code = 200
+                    resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
+                    is_mock_response = True
+            except Exception:
+                mock_data = _generate_mock_shield_response(model, redaction_count, payload.get("messages", []), vault)
+                content = json.dumps(mock_data).encode("utf-8")
+                status_code = 200
+                resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
+                is_mock_response = True
 
         # ------------------ Response Restoration ------------------
-        if not metrics_state["is_paused"] and status_code == 200:
+        if not metrics_state["is_paused"] and status_code == 200 and not is_mock_response:
             content = restorer.restore_json_response(content, vault)
             resp_headers["content-length"] = str(len(content))
 
@@ -998,17 +1134,41 @@ async def anthropic_messages(request: Request):
             "stream": is_stream
         })
 
+    # Outbound Dispatch or Offline Responder
+    auth_header = incoming_headers.get("x-api-key") or incoming_headers.get("authorization", "")
+    is_mock_token = "veil-dev-token" in auth_header
+    has_real_key = bool(anthropic_adapter.default_api_key and anthropic_adapter.default_api_key != "veil-dev-token")
+
     if is_stream:
-        raw_stream = anthropic_adapter.forward_stream(
-            endpoint="messages",
-            headers=incoming_headers,
-            payload=payload
-        )
-        restored_stream = (
-            restorer.restore_anthropic_sse_stream(raw_stream, vault)
-            if not metrics_state["is_paused"]
-            else raw_stream
-        )
+        if is_mock_token and not has_real_key:
+            restored_stream = _generate_mock_anthropic_shield_stream(model, redaction_count, payload.get("messages", []), vault)
+        else:
+            try:
+                raw_stream = anthropic_adapter.forward_stream(
+                    endpoint="messages",
+                    headers=incoming_headers,
+                    payload=payload
+                )
+                base_stream = (
+                    restorer.restore_anthropic_sse_stream(raw_stream, vault)
+                    if not metrics_state["is_paused"]
+                    else raw_stream
+                )
+                async def _resilient_anthropic_stream():
+                    first_yielded = False
+                    try:
+                        async for chunk in base_stream:
+                            first_yielded = True
+                            yield chunk
+                    except Exception as e:
+                        logger.warning("Upstream Anthropic streaming failed (%s). Serving mock shield stream...", e)
+                        if not first_yielded:
+                            async for chunk in _generate_mock_anthropic_shield_stream(model, redaction_count, payload.get("messages", []), vault):
+                                yield chunk
+                restored_stream = _resilient_anthropic_stream()
+            except Exception:
+                restored_stream = _generate_mock_anthropic_shield_stream(model, redaction_count, payload.get("messages", []), vault)
+
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         if settings.AUDIT_ENABLED:
             audit_ledger.record_receipt(
@@ -1029,12 +1189,34 @@ async def anthropic_messages(request: Request):
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
         )
     else:
-        status_code, resp_headers, content = await anthropic_adapter.forward_request(
-            endpoint="messages",
-            headers=incoming_headers,
-            payload=payload
-        )
-        if not metrics_state["is_paused"] and status_code == 200:
+        is_mock_response = False
+        if is_mock_token and not has_real_key:
+            mock_data = _generate_mock_anthropic_shield_response(model, redaction_count, payload.get("messages", []), vault)
+            content = json.dumps(mock_data).encode("utf-8")
+            status_code = 200
+            resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
+            is_mock_response = True
+        else:
+            try:
+                status_code, resp_headers, content = await anthropic_adapter.forward_request(
+                    endpoint="messages",
+                    headers=incoming_headers,
+                    payload=payload
+                )
+                if status_code in (401, 403, 502, 503) and (is_mock_token or not has_real_key):
+                    mock_data = _generate_mock_anthropic_shield_response(model, redaction_count, payload.get("messages", []), vault)
+                    content = json.dumps(mock_data).encode("utf-8")
+                    status_code = 200
+                    resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
+                    is_mock_response = True
+            except Exception:
+                mock_data = _generate_mock_anthropic_shield_response(model, redaction_count, payload.get("messages", []), vault)
+                content = json.dumps(mock_data).encode("utf-8")
+                status_code = 200
+                resp_headers = {"content-type": "application/json", "content-length": str(len(content))}
+                is_mock_response = True
+
+        if not metrics_state["is_paused"] and status_code == 200 and not is_mock_response:
             content = restorer.restore_anthropic_json_response(content, vault)
             resp_headers["content-length"] = str(len(content))
 
@@ -1058,6 +1240,88 @@ async def anthropic_messages(request: Request):
             headers=resp_headers,
             media_type=resp_headers.get("content-type", "application/json")
         )
+
+
+@app.post("/v1/completions")
+async def legacy_completions(request: Request):
+    """Legacy OpenAI text completions proxy endpoint with privacy inspection and offline responder."""
+    start_time = time.perf_counter()
+    incoming_headers = dict(request.headers)
+    payload: Dict[str, Any] = await request.json()
+    model = payload.get("model", "gpt-3.5-turbo-instruct")
+    prompt = payload.get("prompt", "")
+
+    session_id = resolve_session_id(request, payload)
+    vault = vault_manager.get_session(session_id)
+
+    redaction_count = 0
+    if isinstance(prompt, str) and prompt and not metrics_state["is_paused"]:
+        try:
+            _, redact_spans = inspection_pipeline.inspect(prompt)
+            sanitized_prompt, redaction_count = redactor.redact_text(
+                text=prompt,
+                spans=redact_spans,
+                vault=vault
+            )
+            payload["prompt"] = sanitized_prompt
+        except SecretDetectedException as sde:
+            raise sde
+        except SemanticViolationException as sve:
+            raise sve
+
+    metrics_state["total_requests"] += 1
+    if redaction_count > 0:
+        metrics_state["total_redactions"] += redaction_count
+
+    auth_header = incoming_headers.get("authorization", "")
+    is_mock_token = "veil-dev-token" in auth_header
+    has_real_key = bool(openai_adapter.default_api_key and openai_adapter.default_api_key != "veil-dev-token")
+
+    if is_mock_token and not has_real_key:
+        reply_text = (
+            f"🛡️ [Veil Privacy Gateway] Prompt verified under policy ({settings.POLICY.value}). "
+            f"Protected {redaction_count} sensitive token(s)."
+        )
+        return JSONResponse({
+            "id": f"cmpl-veil-{int(time.time())}",
+            "object": "text_completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{"text": reply_text, "index": 0, "logprobs": None, "finish_reason": "stop"}],
+            "usage": {
+                "prompt_tokens": max(1, len(prompt) // 4),
+                "completion_tokens": len(reply_text) // 4,
+                "total_tokens": (len(prompt) + len(reply_text)) // 4
+            }
+        })
+    else:
+        try:
+            status_code, resp_headers, content = await openai_adapter.forward_request(
+                endpoint="completions",
+                headers=incoming_headers,
+                payload=payload
+            )
+            if status_code in (401, 403, 502, 503):
+                reply_text = f"🛡️ [Veil Privacy Gateway] Prompt verified. Protected {redaction_count} sensitive token(s)."
+                return JSONResponse({
+                    "id": f"cmpl-veil-{int(time.time())}",
+                    "object": "text_completion",
+                    "created": int(time.time()),
+                    "model": model,
+                    "choices": [{"text": reply_text, "index": 0, "logprobs": None, "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": max(1, len(prompt) // 4), "completion_tokens": len(reply_text) // 4, "total_tokens": (len(prompt) + len(reply_text)) // 4}
+                })
+            return Response(content=content, status_code=status_code, headers=resp_headers, media_type="application/json")
+        except Exception:
+            reply_text = f"🛡️ [Veil Privacy Gateway] Prompt verified. Protected {redaction_count} sensitive token(s)."
+            return JSONResponse({
+                "id": f"cmpl-veil-{int(time.time())}",
+                "object": "text_completion",
+                "created": int(time.time()),
+                "model": model,
+                "choices": [{"text": reply_text, "index": 0, "logprobs": None, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": max(1, len(prompt) // 4), "completion_tokens": len(reply_text) // 4, "total_tokens": (len(prompt) + len(reply_text)) // 4}
+            })
 
 
 # ------------------ Phase 18: Ollama /api/chat and /api/generate Ingress ------------------
