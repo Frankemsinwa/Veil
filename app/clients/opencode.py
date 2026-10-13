@@ -164,11 +164,28 @@ class OpenCodeAdapter(BaseClientAdapter):
             settings_data["openai.baseURL"] = gateway_url
             settings_data["api_base"] = gateway_url
 
+            # Inject veil-dev-token so OpenCode never displays 'API key missing'
+            if not settings_data.get("opencode.apiKey"):
+                settings_data["opencode.apiKey"] = "veil-dev-token"
+            if not settings_data.get("openai.apiKey"):
+                settings_data["openai.apiKey"] = "veil-dev-token"
+
             self.atomic_write_json(config_path, settings_data)
+
+            # Also mirror to ~/.opencode/config.json if directory exists
+            user_opencode_cfg = Path.home() / ".opencode" / "config.json"
+            if user_opencode_cfg != config_path and (user_opencode_cfg.exists() or user_opencode_cfg.parent.exists()):
+                try:
+                    u_cfg = self.load_json_safely(user_opencode_cfg) or {}
+                    u_cfg["api_base"] = gateway_url
+                    u_cfg["api_key"] = "veil-dev-token"
+                    self.atomic_write_json(user_opencode_cfg, u_cfg)
+                except Exception:
+                    pass
 
             return MutationResult(
                 success=True,
-                message=f"OpenCode successfully configured to route through Veil at {gateway_url}.",
+                message=f"OpenCode successfully configured to route through Veil at {gateway_url} (with veil-dev-token).",
                 client_id=self.client_id,
                 previous_url=previous_url,
                 new_url=gateway_url,
@@ -204,11 +221,27 @@ class OpenCodeAdapter(BaseClientAdapter):
             if settings_data is not None:
                 for key in self.PROXY_KEYS:
                     settings_data.pop(key, None)
+                if settings_data.get("opencode.apiKey") == "veil-dev-token":
+                    settings_data.pop("opencode.apiKey", None)
+                if settings_data.get("openai.apiKey") == "veil-dev-token":
+                    settings_data.pop("openai.apiKey", None)
                 self.atomic_write_json(config_path, settings_data)
+
+            # Clean ~/.opencode/config.json if it had veil-dev-token
+            user_opencode_cfg = Path.home() / ".opencode" / "config.json"
+            if user_opencode_cfg.exists():
+                try:
+                    u_cfg = self.load_json_safely(user_opencode_cfg)
+                    if u_cfg and u_cfg.get("api_key") == "veil-dev-token":
+                        u_cfg.pop("api_base", None)
+                        u_cfg.pop("api_key", None)
+                        self.atomic_write_json(user_opencode_cfg, u_cfg)
+                except Exception:
+                    pass
 
             return MutationResult(
                 success=True,
-                message="OpenCode disconnected: removed Veil proxy routing.",
+                message="OpenCode disconnected: removed Veil proxy routing and dev tokens.",
                 client_id=self.client_id
             )
         except Exception as e:

@@ -1,5 +1,6 @@
 """Tests for Phase 12: Client Auto-Detection & Safe Configuration Engine."""
 import json
+import pytest
 from pathlib import Path
 from typer.testing import CliRunner
 
@@ -85,6 +86,7 @@ def test_continue_adapter_lifecycle(tmp_path):
 
     data = json.loads(config_file.read_text(encoding="utf-8"))
     assert data["models"][0]["apiBase"] == "http://127.0.0.1:8080/v1"
+    assert data["models"][0]["apiKey"] == "veil-dev-token"
     assert adapter.get_status().status == ClientStatus.CONNECTED
 
     # Disconnect
@@ -287,6 +289,9 @@ def test_opencode_adapter_lifecycle(tmp_path):
     updated_json = json.loads(settings_file.read_text(encoding="utf-8"))
     assert updated_json["opencode.apiBase"] == "http://127.0.0.1:8080/v1"
     assert updated_json["openai.baseURL"] == "http://127.0.0.1:8080/v1"
+    assert updated_json["api_base"] == "http://127.0.0.1:8080/v1"
+    assert updated_json["opencode.apiKey"] == "veil-dev-token"
+    assert updated_json["openai.apiKey"] == "veil-dev-token"
 
     # Disconnect / Rollback
     disc_res = adapter.disconnect()
@@ -296,6 +301,8 @@ def test_opencode_adapter_lifecycle(tmp_path):
     rolled_back_json = json.loads(settings_file.read_text(encoding="utf-8"))
     assert rolled_back_json["openai.baseURL"] == "https://api.openai.com/v1"
     assert "opencode.apiBase" not in rolled_back_json
+    assert "opencode.apiKey" not in rolled_back_json
+    assert "openai.apiKey" not in rolled_back_json
 
 
 def test_client_manager_includes_opencode():
@@ -304,5 +311,117 @@ def test_client_manager_includes_opencode():
     assert opencode_client is not None
     assert opencode_client.name == "OpenCode IDE"
     assert opencode_client.client_type == ClientType.OPENCODE
+
+
+def test_antigravity_rules_and_workspace_automation(tmp_path):
+    """Verify Antigravity installs global rule, workspace rule, settings, and MCP server."""
+    mcp_file = tmp_path / "config" / "mcp_config.json"
+    settings_file = tmp_path / "settings.json"
+    global_rule = tmp_path / "config" / "rules" / "veil_privacy.md"
+    workspace_rule = tmp_path / "workspace" / ".agents" / "rules" / "veil_privacy.md"
+
+    adapter = AntigravityAdapter(
+        config_path_override=mcp_file,
+        settings_path_override=settings_file,
+        global_rule_override=global_rule,
+        workspace_rule_override=workspace_rule,
+    )
+
+    # Initial connect
+    res = adapter.connect("http://127.0.0.1:8080/v1")
+    assert res.success is True
+
+    # Check MCP
+    mcp_data = json.loads(mcp_file.read_text(encoding="utf-8"))
+    assert "veil-privacy-guard" in mcp_data["mcpServers"]
+
+    # Check Rules
+    assert global_rule.exists()
+    assert "Veil AI Privacy & Security Guard" in global_rule.read_text(encoding="utf-8")
+    assert workspace_rule.exists()
+    assert "veil-privacy-guard" in workspace_rule.read_text(encoding="utf-8")
+
+    # Check settings
+    settings_data = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert settings_data["openai.baseURL"] == "http://127.0.0.1:8080/v1"
+    assert settings_data["openai.apiKey"] == "veil-dev-token"
+
+    # Status check
+    status = adapter.get_status()
+    assert status.status == ClientStatus.CONNECTED
+    assert status.details["global_rule"] is True
+    assert status.details["workspace_rule"] is True
+    assert status.details["mcp_active"] is True
+
+    # Test connection probe
+    probe = adapter.test_connection("http://127.0.0.1:8080/v1")
+    assert probe["client_id"] == "antigravity"
+    assert probe["status"] == "VERIFIED"
+    assert probe["is_routed"] is True
+
+    # Disconnect
+    disc = adapter.disconnect()
+    assert disc.success is True
+    assert not global_rule.exists()
+    assert not workspace_rule.exists()
+
+
+def test_client_manager_test_client_connection():
+    """Verify ClientManager.test_client_connection handles recognized and unknown clients."""
+    mgr = ClientManager()
+    res = mgr.test_client_connection("opencode")
+    assert "client_id" in res
+    assert res["client_id"] == "opencode"
+    assert "latency_ms" in res
+
+    bad_res = mgr.test_client_connection("unknown_fake_client")
+    assert bad_res["success"] is False
+    assert "not recognized" in bad_res["message"]
+
+
+@pytest.mark.asyncio
+async def test_api_client_test_and_ping_endpoints():
+    """Verify POST /api/clients/{id}/test and /ping endpoints return diagnostic probe results."""
+    from httpx import AsyncClient, ASGITransport
+    from app.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Test opencode
+        resp = await client.post("/api/clients/opencode/test")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["client_id"] == "opencode"
+        assert "message" in data
+        assert "latency_ms" in data
+
+        # Test ping alias
+        ping_resp = await client.post("/api/clients/antigravity/ping")
+        assert ping_resp.status_code == 200
+        ping_data = ping_resp.json()
+        assert ping_data["client_id"] == "antigravity"
+
+        # Test unknown client
+        bad_resp = await client.post("/api/clients/nonexistent_client/test")
+        assert bad_resp.status_code == 200
+        bad_data = bad_resp.json()
+        assert bad_data["success"] is False
+        assert "not recognized" in bad_data["message"]
+
+
+def test_cli_test_and_ping_client():
+    """Verify veil test-client and veil ping-client CLI commands."""
+    res_test = runner.invoke(cli, ["test-client", "opencode"])
+    assert res_test.exit_code == 0
+    assert "Testing connection for 'opencode'" in res_test.output
+
+    res_ping = runner.invoke(cli, ["ping-client", "antigravity"])
+    assert res_ping.exit_code == 0
+    assert "Testing connection for 'antigravity'" in res_ping.output
+
+    res_unknown = runner.invoke(cli, ["test-client", "unknown_tool"])
+    assert res_unknown.exit_code == 0
+    assert "not recognized" in res_unknown.output
+
 
 

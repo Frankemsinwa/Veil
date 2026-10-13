@@ -39,6 +39,8 @@ class ResponseRestorer:
             restored = self.restore_text(text, vault)
             return restored.encode("utf-8")
 
+    restore_openai_json_response = restore_json_response
+
     async def restore_sse_stream(
         self,
         upstream_stream: AsyncGenerator[bytes, None],

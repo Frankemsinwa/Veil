@@ -93,36 +93,36 @@ flowchart TD
 
 ## 4. Phase-by-Phase Implementation Plan
 
-### Phase 1: Transparent System Proxy & SSL Interception (The "Zero-Config" Pillar)
+### Phase 1: Transparent System Proxy & SSL Interception (The "Zero-Config" Pillar) — `[COMPLETED]`
 *Goal: Intercept 100% of AI prompts without requiring developers to change any settings in any IDE.*
 
-1. **Local Root Certificate Generation & Trust Store Injection:**
-   - On first launch, Veil generates an encrypted, device-unique CA certificate (`Veil CA Authority`).
-   - Automatically registers it in the Windows Root Certificate Store (`certutil -addstore -user "Root"`).
-2. **Transparent AI Domain Interception:**
-   - Integrate a lightweight transparent proxy engine based on Python's mature proxy core.
-   - Automatically intercepts only AI provider domains:
-     - `api.openai.com`
-     - `api.anthropic.com`
-     - `generativelanguage.googleapis.com`
-     - `daily-cloudcode-pa.googleapis.com` (Antigravity upstream)
-     - `api.cursor.sh`
-   - All non-AI web traffic passes through untouched without decryption.
-3. **1-Click System Proxy Toggle:**
-   - Enable Windows system proxy (`127.0.0.1:8080`) when Veil is "Shield Active".
-   - Instantly restore Windows network settings on exit or shutdown.
+1. **Local Root Certificate Generation & Trust Store Injection:** `[DONE]`
+   - Device-unique CA certificate (`Veil CA Authority`) generated with RSA 4096 and SHA-256.
+   - Automatically registers in the Windows Root Certificate Store via CryptoAPI (`CertAddCertificateContextToStore` / `certutil`).
+2. **Transparent AI Domain Interception:** `[DONE]`
+   - Asyncio transparent proxy engine with dynamic SNI leaf certificate minting on `127.0.0.1:8888`.
+   - Intercepts AI provider domains: `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, `daily-cloudcode-pa.googleapis.com`, `api.cursor.sh`.
+   - Non-AI traffic tunnels through transparently without inspection.
+3. **1-Click System Proxy Toggle:** `[DONE]`
+   - Windows WinINet system proxy toggle (`127.0.0.1:8888`) via Cockpit UI switch, REST API (`/api/proxy/system/enable`), and CLI (`veil proxy on|off`).
+   - Clean rollback on gateway shutdown.
 
-### Phase 2: Autonomous IDE Config Injectors & Live Verification (The "Belt and Suspenders" Pillar)
+### Phase 2: Autonomous IDE Config Injectors & Live Verification (The "Belt and Suspenders" Pillar) — `[COMPLETED]`
 *Goal: Ensure that IDEs configured with explicit API bases never fail and have instant feedback.*
 
-1. **Persistent OpenCode & Continue Auto-Wiring:**
-   - Detect active OpenCode profile and ensure `settings.json` has both `opencode.apiBase` and `openai.baseURL` set to `http://127.0.0.1:8080/v1`.
-   - Inject a mock API key `veil-dev-token` so the IDE never claims "API key missing".
-2. **Antigravity Rule & MCP Automation:**
-   - Automatically install the workspace rule `.agents/rules/veil_privacy.md` and global rule in `~/.gemini/config/rules/veil_privacy.md`.
-   - Register `veil-privacy-guard` in `~/.gemini/config/mcp_config.json`.
-3. **Status Check & Ping:**
-   - Add a "Test Connection" button in the Cockpit UI next to each detected IDE that fires a sample probe to verify whether traffic from that IDE is successfully reaching Veil.
+1. **Persistent OpenCode & Continue Auto-Wiring:** `[DONE]`
+   - Injects `opencode.apiBase`, `openai.baseURL`, and `api_base` pointing to `http://127.0.0.1:8080/v1`.
+   - Injects `veil-dev-token` mock API key into OpenCode and Continue.dev model configs to prevent "API key missing" blocks.
+   - 1-click configuration rollback restores `.veil.bak` backup or cleanly removes injected proxy keys.
+2. **Antigravity Rule & MCP Automation:** `[DONE]`
+   - Automatically installs global rule `~/.gemini/config/rules/veil_privacy.md` and workspace rule `.agents/rules/veil_privacy.md`.
+   - Registers native `veil-privacy-guard` MCP server in `~/.gemini/config/mcp_config.json`.
+   - Sets `openai.baseURL` and `openai.apiKey: veil-dev-token` in Antigravity user settings.
+3. **Status Check & Live Ping Probe:** `[DONE]`
+   - Added `test_connection()` probe diagnostics returning live latency, routed status, and detailed diagnostics.
+   - REST API endpoints: `POST /api/clients/{client_id}/test` and `POST /api/clients/{client_id}/ping`.
+   - CLI commands: `veil test-client <id>` and `veil ping-client <id>`.
+   - Cockpit UI: "Test" connection button next to each IDE card with live latency toasts.
 
 ### Phase 3: Intelligent Offline & Demo Responder (The "Never Crash" Pillar)
 *Goal: An IDE connected to Veil must NEVER display "Network Issue" or a blank error screen.*

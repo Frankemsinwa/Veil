@@ -1044,7 +1044,7 @@ code, kbd, pre, .mono { font-family: var(--mono); }
 .client-route { font-family: var(--mono); font-size: 11px; color: var(--text-3); margin-top: 4px; }
 .client-route b { color: var(--text-2); font-weight: 400; }
 
-.client-actions { display: flex; justify-content: flex-end; min-width: 104px; }
+.client-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-width: 140px; }
 
 .skeleton-row {
   display: grid;

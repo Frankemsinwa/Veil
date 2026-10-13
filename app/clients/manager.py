@@ -1,5 +1,5 @@
 """Unified Client Manager discovering and controlling all client adapters."""
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from app.core.config import settings
 from app.clients.base import BaseClientAdapter
@@ -85,6 +85,20 @@ class ClientManager:
             if status.status.value == "CONNECTED":
                 results[cid] = adapter.disconnect()
         return results
+
+    def test_client_connection(self, client_id: str, gateway_url: Optional[str] = None) -> Dict[str, Any]:
+        """Runs an active ping and diagnostic probe verifying connectivity between the client and Veil."""
+        adapter = self.get_client(client_id)
+        if not adapter:
+            return {
+                "success": False,
+                "client_id": client_id,
+                "name": client_id,
+                "status": "UNKNOWN",
+                "message": f"Client '{client_id}' is not recognized by Veil."
+            }
+        target_url = gateway_url or f"http://{settings.HOST}:{settings.PORT}/v1"
+        return adapter.test_connection(target_url)
 
 
 # Global client manager singleton

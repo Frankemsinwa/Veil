@@ -178,11 +178,19 @@ async def test_transparent_proxy_passthrough_tunnel(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_transparent_proxy_intercepted_ai_prompt(tmp_path: Path):
+async def test_transparent_proxy_intercepted_ai_prompt(tmp_path: Path, monkeypatch):
     """End-to-End Test: Intercepted AI domain undergoes dynamic leaf SSL termination and PII redaction."""
     import json
     ca = CertificateAuthority(base_dir=tmp_path)
     ca.load_or_create_root_ca()
+
+    orig_open_conn = asyncio.open_connection
+    async def mock_open_conn(host, port, *args, **kwargs):
+        if host == "api.openai.com":
+            raise ConnectionRefusedError("Simulated offline upstream for test")
+        return await orig_open_conn(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "open_connection", mock_open_conn)
 
     proxy = TransparentProxyServer(
         host="127.0.0.1",

@@ -361,6 +361,35 @@ def disconnect_all_clients():
             console.print(f"[bold red][FAIL] {cid}: {res.message}[/bold red]")
 
 
+@cli.command("test-client")
+@cli.command("ping-client")
+def test_client_cli(
+    client_id: str = typer.Argument(..., help="Client ID to test: opencode, antigravity, cursor, continue, claude_code, aider, system_env")
+):
+    """Test connectivity from an IDE/client configuration to Veil Gateway."""
+    console.print(f"[bold cyan]Testing connection for '{client_id}'...[/bold cyan]")
+    res = client_manager.test_client_connection(client_id)
+    if res.get("success"):
+        console.print(Panel.fit(
+            f"[bold green]CONNECTION VERIFIED[/bold green]\n\n"
+            f"Client:       {res.get('name')}\n"
+            f"Status:       [bold yellow]{res.get('status')}[/bold yellow]\n"
+            f"Routing:      {'ACTIVE (Veil-Protected)' if res.get('is_routed') else 'STANDBY (Direct Upstream)'}\n"
+            f"Latency:      {res.get('latency_ms', 0)}ms\n"
+            f"Details:      {res.get('message')}",
+            title="[bold green]Diagnostics Success[/bold green]",
+            border_style="green"
+        ))
+    else:
+        console.print(Panel.fit(
+            f"[bold red]DIAGNOSTICS FAILED[/bold red]\n\n"
+            f"Client:       {res.get('name', client_id)}\n"
+            f"Details:      {res.get('message')}",
+            title="[bold red]Connection Error[/bold red]",
+            border_style="red"
+        ))
+
+
 @cli.command("gui")
 def gui(
     host: str = typer.Option(settings.HOST, "--host", "-h", help="Bind address"),

@@ -113,3 +113,44 @@ class BaseClientAdapter(ABC):
                 return json.loads(clean_text)
         except Exception:
             return None
+
+    def test_connection(self, gateway_url: str = "http://127.0.0.1:8080/v1") -> Dict[str, Any]:
+        """Fires an active diagnostic probe to test whether Veil gateway responds for this client."""
+        info = self.get_status()
+        is_routed = bool(info.current_base_url and "127.0.0.1" in str(info.current_base_url))
+
+        import urllib.request
+        import time
+
+        health_url = gateway_url.replace("/v1", "").rstrip("/") + "/health"
+        t0 = time.perf_counter()
+        try:
+            req = urllib.request.Request(health_url, headers={"User-Agent": f"Veil-Probe/{self.client_id}"})
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                if resp.status == 200:
+                    if is_routed:
+                        msg = f"[OK] Verified! {self.name} is configured to route prompts through Veil ({round(elapsed_ms, 1)}ms)."
+                    else:
+                        msg = f"Veil Gateway is online ({round(elapsed_ms, 1)}ms), but {self.name} is not routed yet. Click 'Connect' to activate."
+                    return {
+                        "success": True,
+                        "client_id": self.client_id,
+                        "name": self.name,
+                        "is_routed": is_routed,
+                        "status": info.status.value,
+                        "url": info.current_base_url or gateway_url,
+                        "latency_ms": round(elapsed_ms, 2),
+                        "message": msg
+                    }
+        except Exception as e:
+            return {
+                "success": False,
+                "client_id": self.client_id,
+                "name": self.name,
+                "is_routed": is_routed,
+                "status": info.status.value,
+                "url": info.current_base_url,
+                "latency_ms": 0.0,
+                "message": f"Cannot reach local Veil Gateway at {health_url} ({e}). Ensure Veil is running."
+            }

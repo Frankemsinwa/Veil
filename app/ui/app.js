@@ -757,6 +757,10 @@
     if (isConnected) {
       badge = `<span class="pill ok"><span class="dot ok live"></span>CONNECTED</span>`;
       actionBtn = `
+        <button class="btn btn-sm btn-ghost btn-client-test" data-id="${escapeHtml(client.id)}" title="Run live connection probe & test latency">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></span>
+          <span>Test</span>
+        </button>
         <button class="btn btn-sm btn-danger btn-client-disconnect" data-id="${escapeHtml(client.id)}">
           <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>
           <span>Disconnect</span>
@@ -765,6 +769,10 @@
     } else if (isDetected) {
       badge = `<span class="pill warn"><span class="dot warn"></span>DETECTED</span>`;
       actionBtn = `
+        <button class="btn btn-sm btn-ghost btn-client-test" data-id="${escapeHtml(client.id)}" title="Verify local client reachability">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></span>
+          <span>Test</span>
+        </button>
         <button class="btn btn-sm btn-primary btn-client-connect" data-id="${escapeHtml(client.id)}">
           <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
           <span>Connect</span>
@@ -853,6 +861,28 @@
         } finally {
           btn.classList.remove('is-loading');
           fetchClients();
+        }
+      });
+    });
+
+    // Test Connection Probe Buttons
+    DOM.clientsContainer.querySelectorAll('.btn-client-test').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = btn.dataset.id;
+        btn.classList.add('is-loading');
+        try {
+          const res = await fetch(`/api/clients/${id}/test`, { method: 'POST' });
+          const data = await res.json();
+          if (data.success) {
+            const ms = data.latency_ms != null ? `${data.latency_ms}ms` : 'active';
+            showToast(`${data.name || id} Verified`, 'ok', `${data.message} (${ms})`);
+          } else {
+            showToast(`${id} Test Failed`, 'bad', data.message || 'Cannot reach gateway.');
+          }
+        } catch (err) {
+          showToast(`Network Error`, 'bad', `Failed to execute ping probe for ${id}`);
+        } finally {
+          btn.classList.remove('is-loading');
         }
       });
     });

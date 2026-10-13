@@ -199,6 +199,14 @@ async def disconnect_client_endpoint(client_id: str):
     return result.model_dump()
 
 
+@app.post("/api/clients/{client_id}/test")
+@app.post("/api/clients/{client_id}/ping")
+async def test_client_connection_endpoint(client_id: str):
+    """Fires a diagnostic probe verifying connectivity between client configuration and Veil."""
+    result = client_manager.test_client_connection(client_id)
+    return result
+
+
 # ------------------ Phase 1: Transparent System Proxy API ------------------
 
 @app.get("/api/proxy/status")

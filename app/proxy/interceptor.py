@@ -57,8 +57,8 @@ class TransparentProxyServer:
         ca: Optional[CertificateAuthority] = None,
         intercepted_domains: Optional[List[str]] = None,
     ):
-        self.host = host or settings.PROXY_HOST
-        self.port = port or settings.PROXY_PORT
+        self.host = host if host is not None else settings.PROXY_HOST
+        self.port = port if port is not None else settings.PROXY_PORT
         self.ca = ca or ca_instance
         self.classifier = DomainClassifier(intercepted_domains)
         self.pipeline = InspectionPipeline()
@@ -103,6 +103,8 @@ class TransparentProxyServer:
             host=self.host,
             port=self.port,
         )
+        if self._server and self._server.sockets:
+            self.port = self._server.sockets[0].getsockname()[1]
         self._is_running = True
         logger.info(
             "Veil Transparent Proxy listening on %s:%d (Intercepting %s)",

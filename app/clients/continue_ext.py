@@ -110,13 +110,16 @@ class ContinueAdapter(BaseClientAdapter):
                 previous_url = models[0].get("apiBase")
                 for m in models:
                     m["apiBase"] = gateway_url
+                    if not m.get("apiKey"):
+                        m["apiKey"] = "veil-dev-token"
             else:
                 # Add default Veil-protected model entry
                 models.append({
                     "title": "Veil Protected Model",
                     "provider": "openai",
                     "model": "gpt-4o",
-                    "apiBase": gateway_url
+                    "apiBase": gateway_url,
+                    "apiKey": "veil-dev-token"
                 })
                 data["models"] = models
 
