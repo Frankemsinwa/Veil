@@ -2,12 +2,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
-# PyInstaller temporary build cache
+# PyInstaller build artifacts and distribution binaries
 build/
+dist/
+*.spec.bak
 
 # Testing and environments
 .pytest_cache/
 .venv/
 venv/
 env/
+
+# Local database and keys
+.veil/
+
