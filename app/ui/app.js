@@ -2754,6 +2754,189 @@
 
     updateCurrencyDisplay();
     fetchBillingStatus();
+
+    // Phase 4: Persistent Instant Probe Live Test Bar
+    initGlobalProbeBar();
+  }
+
+  /**
+   * Phase 4: Persistent Instant Probe Live Test Bar Controller
+   */
+  function initGlobalProbeBar() {
+    const input = document.getElementById('global-probe-input');
+    const clearBtn = document.getElementById('btn-clear-global-probe');
+    const submitBtn = document.getElementById('btn-submit-global-probe');
+    const tray = document.getElementById('global-probe-tray');
+    const statusPill = document.getElementById('global-probe-status-pill');
+    const latencyText = document.getElementById('global-probe-latency-text');
+    const tagsContainer = document.getElementById('global-probe-tags');
+    const previewContainer = document.getElementById('global-probe-preview');
+    const copyBtn = document.getElementById('btn-copy-probe-output');
+
+    if (!input || !tray) return;
+
+    let debounceTimer = null;
+    let latestOutputText = '';
+
+    async function executeProbe() {
+      const text = input.value.trim();
+      if (!text) {
+        tray.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        return;
+      }
+
+      if (clearBtn) clearBtn.style.display = 'flex';
+      const startTime = performance.now();
+
+      try {
+        const res = await fetch('/api/test/sanitize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+
+        const elapsedMs = (performance.now() - startTime).toFixed(1);
+
+        if (res.ok) {
+          const data = await res.json();
+          renderProbeResult(data, elapsedMs);
+          fetchMetrics();
+        } else {
+          const err = await res.json();
+          renderProbeResult({
+            blocked: true,
+            violations: [{ entity_type: err.detail || 'Inspection Error' }],
+            matches: []
+          }, elapsedMs);
+        }
+      } catch (err) {
+        console.error('Probe error:', err);
+      }
+    }
+
+    function renderProbeResult(data, fallbackLatency) {
+      tray.style.display = 'block';
+      const latency = data.latency_ms !== undefined ? `${data.latency_ms}ms` : `${fallbackLatency}ms`;
+      if (latencyText) latencyText.textContent = `⚡ ${latency}`;
+
+      if (statusPill) {
+        statusPill.className = 'pill';
+        if (data.blocked) {
+          statusPill.classList.add('bad');
+          statusPill.textContent = '🛡️ BLOCKED (STRICT POLICY)';
+        } else if (data.redaction_count > 0) {
+          statusPill.classList.add('ok');
+          statusPill.textContent = `🛡️ SANITIZED (${data.redaction_count} Tokens)`;
+        } else {
+          statusPill.classList.add('info');
+          statusPill.textContent = '✅ CLEAN PASS';
+        }
+      }
+
+      if (tagsContainer) {
+        tagsContainer.innerHTML = '';
+        const enginesSeen = new Set();
+        if (data.matches && Array.isArray(data.matches)) {
+          data.matches.forEach(m => {
+            if (!enginesSeen.has(m.engine)) {
+              enginesSeen.add(m.engine);
+              const tag = document.createElement('span');
+              tag.className = 'pill sm';
+              if (m.engine.includes('Pro') || m.engine.includes('Dictionary')) {
+                tag.classList.add('info');
+              } else if (m.engine.includes('Vector')) {
+                tag.classList.add('warning');
+              } else if (data.blocked) {
+                tag.classList.add('bad');
+              } else {
+                tag.classList.add('ok');
+              }
+              tag.textContent = m.engine;
+              tagsContainer.appendChild(tag);
+            }
+          });
+        }
+
+        if (enginesSeen.size === 0) {
+          const tag = document.createElement('span');
+          tag.className = 'pill sm ' + (data.blocked ? 'bad' : 'ok');
+          tag.textContent = data.blocked ? 'Credential Blocker' : 'Zero Leaks';
+          tagsContainer.appendChild(tag);
+        }
+      }
+
+      if (previewContainer) {
+        if (data.blocked) {
+          const violationDetails = (data.violations || []).map(v => v.entity_type || v.category || 'Secret').join(', ');
+          latestOutputText = `[BLOCKED BY VEIL: ${violationDetails}]`;
+          previewContainer.innerHTML = `<span class="token-placeholder blocked">[BLOCKED BY VEIL]</span> <span style="color: var(--rose);">Outbound prompt prohibited by active policy (${state.policy}). Found: ${escapeHtml(violationDetails)}</span>`;
+        } else {
+          latestOutputText = data.sanitized_text || data.original_text || '';
+          let highlightedHtml = escapeHtml(latestOutputText);
+
+          highlightedHtml = highlightedHtml.replace(/\[([A-Z0-9_]+)\]/g, (match, p1) => {
+            let badgeClass = 'regex';
+            if (p1.startsWith('PROJECT') || p1.startsWith('CUSTOM') || p1.startsWith('NDA')) {
+              badgeClass = 'custom-dict';
+            } else if (p1.startsWith('CONFIDENTIAL') || p1.startsWith('VECTOR')) {
+              badgeClass = 'vector';
+            }
+            return `<span class="token-placeholder ${badgeClass}">${match}</span>`;
+          });
+
+          previewContainer.innerHTML = highlightedHtml || '<span class="muted">No content</span>';
+        }
+      }
+    }
+
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      if (!input.value.trim()) {
+        tray.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        return;
+      }
+      debounceTimer = setTimeout(executeProbe, 200);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        clearTimeout(debounceTimer);
+        executeProbe();
+      } else if (e.key === 'Escape') {
+        input.value = '';
+        tray.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+      }
+    });
+
+    if (submitBtn) {
+      submitBtn.addEventListener('click', () => {
+        clearTimeout(debounceTimer);
+        executeProbe();
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        input.value = '';
+        tray.style.display = 'none';
+        clearBtn.style.display = 'none';
+        input.focus();
+      });
+    }
+
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        if (!latestOutputText) return;
+        navigator.clipboard.writeText(latestOutputText).then(() => {
+          showToast('Copied sanitized output to clipboard', 'ok');
+        }).catch(() => {
+          showToast('Failed to copy text', 'bad');
+        });
+      });
+    }
   }
 
   // Boot on DOM ready

@@ -56,6 +56,9 @@ def _warmup_models():
 async def lifespan(app: FastAPI):
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
     install_log_scrubber()
+    # Ensure 30-day Developer Pro evaluation license is active on fresh install (Phase 4)
+    from app.licensing.manager import license_manager
+    license_manager.ensure_trial_license()
     # Pre-warm local quantized embedding models in a thread to ensure zero cold-start delay
     asyncio.create_task(asyncio.to_thread(_warmup_models))
 
@@ -556,6 +559,7 @@ async def serve_dashboard():
 @app.post("/api/test/sanitize")
 async def test_sanitize(request: Request):
     """Sandbox endpoint for testing prompt inspection and redaction live from the Cockpit UI."""
+    start_time = time.perf_counter()
     body = await request.json()
     text = body.get("text", "")
     session_id = f"sandbox_{int(time.time() * 1000)}"
@@ -568,20 +572,52 @@ async def test_sanitize(request: Request):
             spans=redact_spans,
             vault=vault
         )
+
+        matches = []
+        for s in redact_spans:
+            entity_val = s.entity_type.value if hasattr(s.entity_type, "value") else str(s.entity_type)
+            engine_type = "Deterministic Regex"
+            if entity_val == "CUSTOM_ENTITY":
+                engine_type = "Custom Dictionary (Pro)"
+            elif entity_val == "VECTOR_GUARDRAIL":
+                engine_type = "Dense Vector Vault (Pro)"
+            elif entity_val == "GENERIC_SECRET_ENTROPY":
+                engine_type = "Shannon Entropy"
+
+            placeholder = vault.get_or_create_placeholder(
+                entity_type=s.metadata.get("placeholder_prefix") if (s.metadata and s.metadata.get("placeholder_prefix")) else entity_val,
+                original_val=s.matched_text
+            )
+            matches.append({
+                "entity_type": entity_val,
+                "category": s.category.value if hasattr(s.category, "value") else str(s.category),
+                "matched_text": s.matched_text,
+                "placeholder": placeholder,
+                "engine": engine_type,
+                "confidence": s.confidence,
+                "metadata": s.metadata or {}
+            })
+
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+        metrics_state["total_requests"] += 1
         if redaction_count > 0:
+            metrics_state["total_redactions"] += redaction_count
             privacy_event_bus.publish_sync("redaction", {
                 "session_id": session_id,
                 "model": "sandbox",
                 "entity_type": "PII / Sensitive",
-                "placeholder": f"<{redaction_count} tokens sanitized>"
+                "placeholder": f"<{redaction_count} tokens sanitized>",
+                "latency_ms": elapsed_ms
             })
         else:
             privacy_event_bus.publish_sync("clean_pass", {
                 "session_id": session_id,
                 "model": "sandbox",
                 "redaction_count": 0,
-                "reason": "Clean inspection test"
+                "reason": "Clean inspection probe",
+                "latency_ms": elapsed_ms
             })
+
         if settings.AUDIT_ENABLED:
             audit_ledger.record_receipt(
                 session_id=session_id,
@@ -591,22 +627,34 @@ async def test_sanitize(request: Request):
                 action_taken="ALLOWED_REDACTED" if redaction_count > 0 else "ALLOWED_CLEAN",
                 redaction_count=redaction_count,
                 secret_blocked_count=0,
-                entities_detected=[s.entity_type for s in redact_spans],
-                latency_ms=1.0
+                entities_detected=[s.entity_type.value if hasattr(s.entity_type, "value") else str(s.entity_type) for s in redact_spans],
+                latency_ms=elapsed_ms
             )
+
         return {
             "blocked": False,
             "original_text": text,
             "sanitized_text": sanitized_text,
             "redaction_count": redaction_count,
-            "violations": []
+            "latency_ms": elapsed_ms,
+            "matches": matches,
+            "violations": [],
+            "metrics": {
+                "total_requests": metrics_state["total_requests"],
+                "total_redactions": metrics_state["total_redactions"],
+                "total_blocks": metrics_state["total_blocks"]
+            }
         }
     except SecretDetectedException as sde:
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+        metrics_state["total_requests"] += 1
+        metrics_state["total_blocks"] += 1
         privacy_event_bus.publish_sync("blocked", {
             "session_id": session_id,
             "model": "sandbox",
-            "reason": "Test prompt blocked by credential detector",
-            "violations": [v["entity_type"] for v in sde.violations]
+            "reason": "Probe prompt blocked by credential detector",
+            "violations": [v["entity_type"] for v in sde.violations],
+            "latency_ms": elapsed_ms
         })
         if settings.AUDIT_ENABLED:
             audit_ledger.record_receipt(
@@ -618,21 +666,44 @@ async def test_sanitize(request: Request):
                 redaction_count=0,
                 secret_blocked_count=len(sde.violations),
                 entities_detected=[v["entity_type"] for v in sde.violations],
-                latency_ms=1.0
+                latency_ms=elapsed_ms
             )
+        matches = [
+            {
+                "entity_type": v.get("entity_type", "SECRET"),
+                "category": "SECRET",
+                "matched_text": v.get("matched_text", "credential"),
+                "placeholder": "[BLOCKED_CREDENTIAL]",
+                "engine": "Deterministic Regex" if "KEY" in v.get("entity_type", "") or "TOKEN" in v.get("entity_type", "") else "Shannon Entropy",
+                "confidence": 1.0,
+                "metadata": {}
+            }
+            for v in sde.violations
+        ]
         return {
             "blocked": True,
             "original_text": text,
             "sanitized_text": None,
             "redaction_count": 0,
-            "violations": sde.violations
+            "latency_ms": elapsed_ms,
+            "matches": matches,
+            "violations": sde.violations,
+            "metrics": {
+                "total_requests": metrics_state["total_requests"],
+                "total_redactions": metrics_state["total_redactions"],
+                "total_blocks": metrics_state["total_blocks"]
+            }
         }
     except SemanticViolationException as sve:
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+        metrics_state["total_requests"] += 1
+        metrics_state["total_blocks"] += 1
         privacy_event_bus.publish_sync("blocked", {
             "session_id": session_id,
             "model": "sandbox",
             "reason": f"Semantic vector breach: {sve.violations[0].get('category') if sve.violations else 'Confidential'}",
-            "violations": [v.get("category", "PROPRIETARY") for v in sve.violations]
+            "violations": [v.get("category", "PROPRIETARY") for v in sve.violations],
+            "latency_ms": elapsed_ms
         })
         if settings.AUDIT_ENABLED:
             audit_ledger.record_receipt(
@@ -644,15 +715,35 @@ async def test_sanitize(request: Request):
                 redaction_count=0,
                 secret_blocked_count=len(sve.violations),
                 entities_detected=[v.get("category", "PROPRIETARY") for v in sve.violations],
-                latency_ms=1.0
+                latency_ms=elapsed_ms
             )
+        matches = [
+            {
+                "entity_type": "VECTOR_GUARDRAIL",
+                "category": "PROPRIETARY",
+                "matched_text": v.get("matched_text", v.get("category", "Proprietary Data")),
+                "placeholder": "[BLOCKED_PROPRIETARY]",
+                "engine": "Dense Vector Vault (Pro)",
+                "confidence": v.get("similarity", 0.85),
+                "metadata": v
+            }
+            for v in sve.violations
+        ]
         return {
             "blocked": True,
             "original_text": text,
             "sanitized_text": None,
             "redaction_count": 0,
-            "violations": sve.violations
+            "latency_ms": elapsed_ms,
+            "matches": matches,
+            "violations": sve.violations,
+            "metrics": {
+                "total_requests": metrics_state["total_requests"],
+                "total_redactions": metrics_state["total_redactions"],
+                "total_blocks": metrics_state["total_blocks"]
+            }
         }
+
     finally:
         vault_manager.remove_session(session_id)
 

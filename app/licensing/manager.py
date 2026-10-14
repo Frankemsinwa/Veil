@@ -29,9 +29,10 @@ DEFAULT_SIGNING_SALT = b"veil-enterprise-license-master-secret-2026-auth"
 class LicenseManager:
     """Manages cryptographic license verification, storage, and feature checks."""
 
-    def __init__(self, license_file_path: Optional[Path] = None):
+    def __init__(self, license_file_path: Optional[Path] = None, auto_provision_trial: bool = False):
         self.data_dir = settings.DATA_DIR
         self.license_path = license_file_path or (self.data_dir / "license.json")
+        self.auto_provision_trial = auto_provision_trial
         self._cached_license: Optional[LicensePayload] = None
         self._signing_key = self._derive_signing_key()
         self.reload_license()
@@ -79,9 +80,37 @@ class LicenseManager:
             except Exception as e:
                 logger.error(f"Failed to read license file at {self.license_path}: {e}")
 
-        # 3. Fallback to Free / Solo tier
+        # 3. Fallback: Auto-provision trial if enabled, else Free tier
+        if self.auto_provision_trial:
+            return self.ensure_trial_license()
+
         self._cached_license = self._generate_default_free_license()
         return self._cached_license
+
+    def ensure_trial_license(self) -> LicensePayload:
+        """Provisions an auto-activated 30-day Developer Pro evaluation license on fresh installs."""
+        env_key = os.environ.get("VEIL_LICENSE_KEY")
+        if env_key:
+            return self.get_active_license()
+
+        if self.license_path.exists():
+            try:
+                active = self.get_active_license()
+                if active and not active.is_expired():
+                    return active
+            except Exception:
+                pass
+
+        trial_id = f"VL-PRO-TRIAL-{uuid.uuid4().hex[:8].upper()}"
+        key_str, payload = self.issue_license(
+            tier=LicenseTier.PRO,
+            customer_email="developer@trial.veil.local",
+            duration_days=30,
+            custom_license_id=trial_id
+        )
+        self.activate_license(key_str)
+        logger.info(f"Auto-provisioned 30-day Developer Pro evaluation license: {trial_id}")
+        return payload
 
     def issue_license(
         self,
@@ -90,6 +119,7 @@ class LicenseManager:
         duration_days: Optional[int] = 30,
         custom_features: Optional[List[FeatureFlag]] = None,
         custom_max_clients: Optional[int] = None,
+        custom_license_id: Optional[str] = None,
     ) -> Tuple[str, LicensePayload]:
         """Issues a cryptographically signed license key string for a customer."""
         issued_at = time.time()
@@ -97,7 +127,7 @@ class LicenseManager:
         features = custom_features if custom_features is not None else TIER_ENTITLEMENTS[tier]
         max_clients = custom_max_clients if custom_max_clients is not None else TIER_CLIENT_LIMITS[tier]
 
-        unique_id = f"VL-{tier.value}-{uuid.uuid4().hex[:10].upper()}"
+        unique_id = custom_license_id or f"VL-{tier.value}-{uuid.uuid4().hex[:10].upper()}"
 
         payload_dict = {
             "license_id": unique_id,

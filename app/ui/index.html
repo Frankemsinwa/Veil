@@ -202,6 +202,63 @@
         </div>
       </header>
 
+      <!-- Persistent Instant Probe Live Test Bar (Phase 4) -->
+      <section class="live-probe-bar-wrapper" id="global-live-probe-bar" aria-label="Instant Privacy Probe">
+        <div class="live-probe-bar">
+          <div class="live-probe-input-wrap">
+            <span class="live-probe-icon" title="Instant Local Privacy Probe">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+            </span>
+            <input 
+              type="text" 
+              id="global-probe-input" 
+              class="live-probe-input" 
+              placeholder="⚡ Instant Probe: Test any prompt, secret key, or NDA phrase live across all pages (e.g. AWS AKIAIOSFODNN7EXAMPLE, Project Titan under NDA)..."
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button class="live-probe-clear-btn" id="btn-clear-global-probe" title="Clear probe input" style="display: none;">✕</button>
+            <button class="btn btn-primary btn-sm live-probe-submit-btn" id="btn-submit-global-probe">
+              <span class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </span>
+              <span>Probe</span>
+            </button>
+          </div>
+
+          <!-- Instant Live Match Tray (expands dynamically) -->
+          <div class="live-probe-tray" id="global-probe-tray" style="display: none;">
+            <div class="live-probe-tray-head">
+              <div class="live-probe-tray-verdict">
+                <span class="pill ok" id="global-probe-status-pill">CLEAN</span>
+                <span class="live-probe-latency" id="global-probe-latency-text">0.0ms</span>
+              </div>
+              <div class="live-probe-tray-tags" id="global-probe-tags">
+                <!-- Tags populated dynamically -->
+              </div>
+              <div class="live-probe-tray-actions">
+                <button class="btn btn-ghost btn-sm btn-icon" id="btn-copy-probe-output" title="Copy Sanitized Text">
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </span>
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+            <div class="live-probe-preview" id="global-probe-preview">
+              <!-- Rendered sanitized text with highlight tags -->
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Scrollable Content Pane -->
       <div class="content">
 

@@ -146,17 +146,23 @@ flowchart TD
    - All IDEs (Cursor, OpenCode, Continue, Antigravity) render this cleanly as an intentional red security block rather than an unhandled network disconnect.
    - Comprehensive test suite (`tests/test_offline_responder.py`) validated with 100% green pass (8/8 tests, 140/140 total tests).
 
-### Phase 4: Pro Evaluation Experience & Real-Time Cockpit Telemetry
+### Phase 4: Pro Evaluation Experience & Real-Time Cockpit Telemetry — `[COMPLETED]`
 *Goal: Seamless onboarding where all Pro features (Custom Dictionary, Vector Guardrails) work immediately.*
 
-1. **Auto-Activated 30-Day Developer Pro License:**
-   - Fresh installs automatically receive a 30-day trial of the **PRO** tier (`VL-PRO-TRIAL-...`), ensuring that Custom Dictionary and Vector Guardrails are never silently disabled on day one.
-2. **Interactive Live Test Bar:**
-   - On every page of the Cockpit UI (Entity Dictionary, Semantic Vault, Dashboard), include a persistent "Instant Probe" test input.
-   - Typing a word immediately shows:
-     - Whether it matches a Regex, Dictionary Rule, or Vector.
-     - The exact sanitized placeholder (`[PROJECT_001]`).
-     - Live counter incrementing on the telemetry dashboard.
+1. **Auto-Activated 30-Day Developer Pro License:** `[DONE]`
+   - Fresh installs automatically receive a 30-day evaluation trial of the **PRO** tier (`VL-PRO-TRIAL-...`), ensuring that Custom Dictionary, Local Vector Guardrails, and Unlimited Connected IDE Clients work immediately on day one without silent degradation.
+   - Built cryptographic issuance and verification with HMAC-SHA256 signatures in [app/licensing/manager.py](file:///c:/Users/frank/OneDrive/Desktop/Veil/app/licensing/manager.py).
+   - Ensured startup lifecycle auto-provisions and persists the trial license seamlessly via `lifespan` in [app/main.py](file:///c:/Users/frank/OneDrive/Desktop/Veil/app/main.py).
+2. **Interactive Live Test Bar:** `[DONE]`
+   - Implemented a persistent, high-visibility "Instant Probe" test bar directly below the topbar across every view of the Cockpit UI ([app/ui/index.html](file:///c:/Users/frank/OneDrive/Desktop/Veil/app/ui/index.html), [app/ui/style.css](file:///c:/Users/frank/OneDrive/Desktop/Veil/app/ui/style.css)).
+   - Typing any string or clicking "Probe" dynamically displays:
+     - Real-time verdict badge: `ALLOWED (CLEAN)`, `SANITIZED (REDACTED)`, `BLOCKED (STRICT)`.
+     - Exact detection source: `Deterministic Regex`, `Custom Dictionary (Pro)`, `Dense Vector Vault (Pro)`, `Shannon Entropy`.
+     - Exact synthetic placeholders (e.g. `[PROJECT_001]`, `[AWS_KEY_001]`, `[EMAIL_001]`) with color-coded token pills.
+     - Execution latency measurement (e.g. `⚡ 1.2ms`).
+     - One-click copy for sanitized context.
+   - Increments the live telemetry metrics counters (`total_requests`, `total_redactions`, `total_blocks`) in real time on the dashboard.
+   - Comprehensive test suite (`tests/test_pro_evaluation_and_probe.py`) validated with 100% green pass (6/6 tests, 146/146 total tests).
 
 ---
 

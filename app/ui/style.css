@@ -247,6 +247,185 @@ code, kbd, pre, .mono { font-family: var(--mono); }
 .topbar-title .crumb { color: var(--text-3); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
+/* Persistent Instant Probe Live Test Bar (Phase 4) ----------------------- */
+.live-probe-bar-wrapper {
+  padding: 8px 28px;
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 15;
+  flex-shrink: 0;
+}
+
+.live-probe-bar {
+  max-width: 1120px;
+  margin: 0 auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+.live-probe-bar:focus-within {
+  border-color: var(--line-focus);
+  box-shadow: 0 4px 20px rgba(61, 214, 140, 0.12);
+}
+
+.live-probe-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+}
+
+.live-probe-icon {
+  color: var(--emerald);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.live-probe-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font);
+  padding: 4px 0;
+}
+
+.live-probe-input::placeholder {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.live-probe-clear-btn {
+  color: var(--text-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--t-fast) var(--ease);
+}
+
+.live-probe-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.live-probe-submit-btn {
+  padding: 4px 12px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-probe-tray {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-elevated);
+  border-bottom-left-radius: var(--r-md);
+  border-bottom-right-radius: var(--r-md);
+  animation: tray-in 180ms var(--ease-out);
+}
+
+@keyframes tray-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.live-probe-tray-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.live-probe-tray-verdict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-probe-latency {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.live-probe-tray-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.live-probe-preview {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  word-break: break-word;
+  background: var(--bg-input);
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.token-placeholder {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  margin: 0 2px;
+  letter-spacing: -0.02em;
+}
+
+.token-placeholder.regex {
+  background: rgba(61, 214, 140, 0.15);
+  color: var(--emerald);
+  border: 1px solid rgba(61, 214, 140, 0.3);
+}
+
+.token-placeholder.custom-dict {
+  background: rgba(124, 156, 255, 0.15);
+  color: var(--blue);
+  border: 1px solid rgba(124, 156, 255, 0.3);
+}
+
+.token-placeholder.vector {
+  background: rgba(241, 161, 13, 0.15);
+  color: var(--amber);
+  border: 1px solid rgba(241, 161, 13, 0.3);
+}
+
+.token-placeholder.blocked {
+  background: rgba(242, 85, 90, 0.15);
+  color: var(--rose);
+  border: 1px solid rgba(242, 85, 90, 0.3);
+}
+
 .content {
   flex: 1;
   overflow-y: auto;
