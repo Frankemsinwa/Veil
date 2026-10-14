@@ -164,6 +164,23 @@ flowchart TD
    - Increments the live telemetry metrics counters (`total_requests`, `total_redactions`, `total_blocks`) in real time on the dashboard.
    - Comprehensive test suite (`tests/test_pro_evaluation_and_probe.py`) validated with 100% green pass (6/6 tests, 146/146 total tests).
 
+### Phase 5: Packaging & Enterprise Distribution — `[COMPLETED]`
+*Goal: Provide zero-friction installation and distribution across both developer workstations and enterprise fleets.*
+
+1. **Standalone Portable Executable (`dist/Veil.exe`):** `[DONE]`
+   - Single-file compiled binary (79.8 MB) bundling Python 3.12, ONNX Runtime C++ backend, INT8 neural embeddings (`model_quantized.onnx`, `tokenizer.json`), cryptographic MITM proxy engine, and full Cockpit UI (`app/ui`).
+   - Integrated `_MEIPASS` dynamic bundle extraction so all neural models and web assets are resolved automatically on any target machine.
+   - Dual-mode console attachment: double-clicking launches native desktop window and system tray; terminal invocations run rich CLI commands seamlessly.
+2. **Inno Setup Windows Installer (`dist/VeilSetup.exe`):** `[DONE]`
+   - Enterprise setup wizard (81.4 MB) with solid LZMA2 compression.
+   - Automatic Root CA registration task (`installca`) running `Veil.exe proxy install-ca` during installation to pre-trust SSL interception for all local IDEs.
+   - Desktop and Start Menu shortcut creation and Windows startup integration (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
+   - Zero-Corruption Uninstallation Hook: automatically runs `disconnect-all` to restore IDE configuration backups, disables system proxy (`proxy disable`), and uninstalls the Root CA (`proxy uninstall-ca`).
+3. **Enterprise MSI Package (`dist/Veil.msi`):** `[DONE]`
+   - Native Windows Installer package (79.6 MB) compiled via Python `msilib`.
+   - Built for silent, hands-off enterprise rollouts (`msiexec /i Veil.msi /qn`) via Microsoft Intune and Active Directory Group Policy (GPO).
+   - Full test suite passing 100% green (148/148 tests).
+
 ---
 
 ## 5. Implementation Roadmap & Milestones

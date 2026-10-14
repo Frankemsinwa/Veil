@@ -4,6 +4,7 @@ Operates 100% on-device with zero external API calls or network egress.
 Uses INT8 quantized all-MiniLM-L6-v2 running on ONNX Runtime CPU with HuggingFace
 Rust Fast Tokenizer for sub-15ms dense sentence embeddings.
 """
+import sys
 import time
 import logging
 import hashlib
@@ -41,6 +42,12 @@ class LocalVectorEncoder:
 
     def _init_engine(self) -> None:
         """Initialize the ONNX session and fast tokenizer."""
+        # Check PyInstaller frozen bundle location first if not a custom directory
+        if not self._custom_model_dir and getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            meipass_model_dir = Path(sys._MEIPASS) / "data" / "models" / "semantic"
+            if (meipass_model_dir / "model_quantized.onnx").exists() and (meipass_model_dir / "tokenizer.json").exists():
+                self.model_dir = meipass_model_dir
+
         model_file = self.model_dir / "model_quantized.onnx"
         tokenizer_file = self.model_dir / "tokenizer.json"
 

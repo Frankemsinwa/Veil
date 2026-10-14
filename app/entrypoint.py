@@ -41,13 +41,15 @@ def main():
                     pass
             sys.exit(1)
     else:
-        # CLI mode: Attach to parent console on Windows so stdout/stderr print cleanly
+        # CLI mode: Attach to parent console on Windows so stdout/stderr print cleanly in terminal
         if sys.platform == "win32":
             try:
                 import ctypes
-                if ctypes.windll.kernel32.AttachConsole(-1):
-                    sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace")
-                    sys.stderr = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+                # Only attach and open CONOUT$ if stdout is None (standard PyInstaller GUI mode in terminal)
+                if sys.stdout is None:
+                    if ctypes.windll.kernel32.AttachConsole(-1):
+                        sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+                        sys.stderr = open("CONOUT$", "w", encoding="utf-8", errors="replace")
             except Exception:
                 pass
 

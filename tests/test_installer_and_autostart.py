@@ -85,7 +85,11 @@ def test_inno_setup_script_structure():
     assert "OutputBaseFilename=VeilSetup" in content
     assert "desktopicon" in content
     assert "autostart" in content
-    assert "disconnect-all" in content  # Uninstaller hook
+    assert "installca" in content
+    assert "proxy install-ca" in content
+    assert "disconnect-all" in content  # Uninstaller rollback hook
+    assert "proxy disable" in content   # Uninstaller proxy restore
+    assert "proxy uninstall-ca" in content # Uninstaller CA cleanup
     assert "uninsdeletevalue" in content
 
 
